@@ -1,0 +1,158 @@
+// ----------------------------------
+// RSDK Project: Sonic CD
+// Script Description: CBSwitch Object
+// Script Author: Christian Whitehead/Simon Thomley
+// Unpacked by Rubberduckycooly's script unpacker
+// ----------------------------------
+
+// Aliases
+private alias object.value0 : object.timer
+private alias object.value1 : object.triggered
+
+// States
+private alias 0 : CBSWITCH_POINTRIGHT_MAIN
+private alias 4 : CBSWITCH_POINTRIGHT_START
+private alias 5 : CBSWITCH_POINTRIGHT_TRANSITION
+
+private alias 3 : CBSWITCH_POINTLEFT_MAIN
+private alias 1 : CBSWITCH_POINTLEFT_START
+private alias 2 : CBSWITCH_POINTLEFT_TRANSITION
+
+// Player Aliases
+private alias object.xpos : player.xpos
+
+// Reserved object slots
+private alias 10 : SLOT_ZONESETUP
+
+// Conveyor Belt Directions
+private alias 0 : CONVEYOR_RIGHT
+private alias 3 : CONVEYOR_LEFT
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	temp0 = false
+	foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+		if object.triggered == false
+			if player[currentPlayer].xpos > object.xpos
+				BoxCollisionTest(C_TOUCH, object.entityPos, 0, -12, 16, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+				temp0 |= checkResult
+				if checkResult == true
+					switch object.state
+					case CBSWITCH_POINTRIGHT_MAIN
+					case CBSWITCH_POINTLEFT_MAIN
+						PlaySfx(SfxName[Switch], false)
+						
+						if object[SLOT_ZONESETUP].direction == CONVEYOR_RIGHT
+							object[SLOT_ZONESETUP].direction = CONVEYOR_LEFT
+							object.state = CBSWITCH_POINTLEFT_START
+						else
+							object[SLOT_ZONESETUP].direction = CONVEYOR_RIGHT
+							object.state = CBSWITCH_POINTRIGHT_START
+						end if
+						break
+					end switch
+				end if
+			else
+				BoxCollisionTest(C_TOUCH, object.entityPos, -16, -12, 0, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+				temp0 |= checkResult
+				if checkResult == true
+					switch object.state
+					case CBSWITCH_POINTRIGHT_MAIN
+					case CBSWITCH_POINTLEFT_MAIN
+						PlaySfx(SfxName[Switch], false)
+						
+						if object[SLOT_ZONESETUP].direction == CONVEYOR_RIGHT
+							object[SLOT_ZONESETUP].direction = CONVEYOR_LEFT
+							object.state = CBSWITCH_POINTLEFT_START
+						else
+							object[SLOT_ZONESETUP].direction = CONVEYOR_RIGHT
+							object.state = CBSWITCH_POINTRIGHT_START
+						end if
+
+						break
+					end switch
+				end if
+			end if
+		else
+			if player[currentPlayer].xpos > Object.XPos
+				BoxCollisionTest(C_TOUCH, object.entityPos, 0, -12, 16, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+				temp0 |= checkResult
+			else
+				BoxCollisionTest(C_TOUCH, object.entityPos, -16, -12, 0, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+				temp0 |= checkResult
+			end if
+		end if
+	next
+	
+	object.triggered = temp0
+end event
+
+
+
+
+event ObjectDraw
+	switch Object.State
+	case CBSWITCH_POINTLEFT_START
+	case CBSWITCH_POINTRIGHT_START
+		if object.timer < 7
+			object.timer++
+		else
+			object.timer = 0
+			object[SLOT_ZONESETUP].frame = 1
+			object.state++
+		end if
+		break
+
+	case CBSWITCH_POINTLEFT_TRANSITION // 2
+		if object.timer < 7
+			object.timer++
+		else
+			object.timer = 0
+			object[SLOT_ZONESETUP].frame = 2
+			object.state = CBSWITCH_POINTLEFT_MAIN // 3
+		end if
+		break
+
+	case CBSWITCH_POINTRIGHT_TRANSITION // 5
+		if object.timer < 7
+			object.timer++
+		else
+			object.timer = 0
+			object[SLOT_ZONESETUP].frame = 0
+			object.state = CBSWITCH_POINTRIGHT_MAIN // 0
+		end if
+		break
+		
+	end switch
+
+	DrawSprite(object[SLOT_ZONESETUP].frame)
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("R5/Objects.gif")
+	SpriteFrame(-4, -16, 32, 28, 1, 18)
+	SpriteFrame(-8, -36, 16, 48, 125, 1)
+	SpriteFrame(-28, -16, 32, 28, 34, 18)
+end event
+
+
+// ========================
+// Editor Subs
+// ========================
+
+sub RSDKDraw
+	DrawSprite(0)
+end sub
+
+
+sub RSDKLoad
+	LoadSpriteSheet("R5/Objects.gif")
+	SpriteFrame(-4, -16, 32, 28, 1, 18)
+
+	SetVariableAlias(ALIAS_VAR_PROPVAL, "unused")
+end sub

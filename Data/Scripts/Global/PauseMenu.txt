@@ -1,0 +1,300 @@
+// ----------------------------------
+// RSDK Project: KEHDX
+// Script Description: Pause Menu Object
+// Script Author: Lave sIime
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+private alias object.state : object.state
+
+private alias 0 : PAUSE_INIT
+private alias 1 : PAUSE_MAIN
+private alias 2 : PAUSE_CONTINUE
+private alias 3 : PAUSE_RESTART
+private alias 4 : PAUSE_EXIT
+private alias 5 : PAUSE_FADEOUT
+
+// Timer open for general use, though it's primarily used for fading
+private alias object.value0 : object.timer
+
+private alias object.value1 : object.selection
+
+private alias -1 : SELECTION_NULL
+private alias  0 : SELECTION_CONTINUE
+private alias  1 : SELECTION_RESTART
+private alias  2 : SELECTION_EXIT
+private alias  3 : SELECTION_MAX
+
+private alias object.value3 : object.drawnBG
+private alias object.value4 : object.usingTouch
+
+// Menu Boot Mode Aliases
+private alias 3 : BOOTMODE_STAGESELECT
+
+// Player Aliases
+private alias object.drawOrder : player.drawOrder
+
+private alias -1 : DRAWORDER_PLAYER
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	switch object.state
+	case PAUSE_INIT
+		// Init
+		object.state++
+		object.timer = 0
+		
+		object.usingTouch = false
+		object.drawnBG = false		
+
+		// Not yet
+		object.visible = false
+
+		// Not falling through on purpose, we want a one frame delay
+		break
+		
+	case PAUSE_MAIN
+		// Let the menu draw now
+		object.visible = true
+
+		if object.usingTouch == false
+			if keyPress[0].up == true
+				object.selection--
+				if object.selection < SELECTION_CONTINUE
+					object.selection = SELECTION_EXIT
+				end if
+				
+				PlaySfx(SfxName[Menu Move], false)
+			end if
+			
+			if keyPress[0].down == true
+				object.selection++
+				if object.selection > SELECTION_EXIT
+					object.selection = SELECTION_CONTINUE
+				end if
+				
+				PlaySfx(SfxName[Menu Move], false)
+			end if
+			
+			temp0 = keyPress[0].buttonA
+			temp0 |= keyPress[0].buttonB
+			temp0 |= keyPress[0].buttonC
+			temp0 |= keyPress[0].start
+			if temp0 == true
+				object.state = PAUSE_CONTINUE
+				object.state += object.selection
+
+				//magic trick
+				object.visible = false
+			end if
+			
+			object.usingTouch = touchScreen[0].down
+		else
+			temp0 = screen.xcenter
+			temp0 -= 40
+			temp1 = temp0
+			temp1 += 80
+			
+			temp4 = screen.ycenter
+			temp4 -= 30
+			temp5 = temp4
+			temp5 += 20
+			
+			temp2 = SELECTION_CONTINUE
+			while temp2 <= SELECTION_EXIT
+				CheckTouchRect(temp0, temp4, temp1, temp5)
+				
+				if checkResult > -1
+					object.selection = temp2
+				else
+					if touchscreen[0].down == false
+						if object.selection == temp2
+							object.timer = 0
+							
+							object.state = PAUSE_CONTINUE
+							object.state += object.selection
+							
+							// Break from the loop
+							temp2 = SELECTION_MAX
+							
+							//magic trick
+							object.visible = false
+						end if
+					else
+						if object.selection == temp2
+							object.selection = SELECTION_NULL
+						end if
+					end if
+				end if
+				
+				temp4 += 20
+				temp5 += 20
+				temp2++
+			loop
+			
+			temp0 = keyPress[0].up
+			temp0 |= keyPress[0].down
+			temp0 |= keyPress[0].left
+			temp0 |= keyPress[0].right
+			temp0 |= keyPress[0].buttonA
+			temp0 |= keyPress[0].buttonB
+			temp0 |= keyPress[0].buttonC
+			temp0 |= keyPress[0].start
+			if temp0 == true
+				object.usingTouch = false
+				object.selection = SELECTION_CONTINUE
+			end if
+		end if
+		break
+		
+	case PAUSE_CONTINUE
+		PlaySfx(SfxName[Menu Back], false)
+		
+		ResetObjectEntity(object.entityPos, TypeName[Blank Object], 0, 0, 0)
+		stage.state = STAGE_RUNNING
+		ResumeMusic()
+		
+		// Send the players back to their special draw order
+		foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+			player[currentPlayer].drawOrder = DRAWORDER_PLAYER
+		next
+		break
+		
+	case PAUSE_RESTART
+		PlaySfx(SfxName[Menu Select], false)
+		
+		object.state = PAUSE_FADEOUT
+		break
+		
+	case PAUSE_EXIT
+		PlaySfx(SfxName[Menu Select], false)
+		
+		// Set the info to load into the Menu
+		stage.activeList = PRESENTATION_STAGE
+		stage.listPos = 0
+		menu.bootMode = BOOTMODE_STAGESELECT
+		
+		object.state = PAUSE_FADEOUT
+		break
+		
+	case PAUSE_FADEOUT
+		object.timer++
+		
+		// "Choppy" on purpose, can be changed if desired
+		if object.timer == 41
+			LoadStage()
+		end if
+		break
+		
+	end switch
+end event
+
+
+event ObjectDraw
+	if object.visible == false
+		return
+	end if
+	
+	// Draw the Pause Menu
+	
+	// Because the background uses alpha, it should only be drawn once
+	// -> Otherwise, it'll layer every frame and become more and more opaque until it's fully solid
+	if object.drawnBG == false
+		
+		// First, draw the four corners of the menu
+		object.direction = 0
+		while object.direction < 4
+			DrawSpriteScreenFX(0, FX_FLIP, screen.xcenter, screen.ycenter)
+			object.direction++
+		loop
+		
+		temp0 = screen.xcenter
+		temp0 -= 40
+		
+		temp1 = screen.ycenter
+		temp1 -= 28
+		
+		// Background
+		DrawRect(temp0, temp1, 78, 56, 224, 80, 96, 0xE0)
+		
+		// Now, draw the left border
+		// A 1px black column, followed by a 3px red
+		DrawRect(temp0, temp1, 1, 56, 8, 0, 0, 255)
+		temp0++
+		DrawRect(temp0, temp1, 3, 56, 224, 64, 96, 255)
+		
+		temp0 += 75
+		
+		// Then comes the right border, same layout but inversed
+		DrawRect(temp0, temp1, 3, 56, 224, 64, 96, 255)
+		temp0 += 3
+		DrawRect(temp0, temp1, 1, 56, 8, 0, 0, 255)
+		
+		object.drawnBG = true
+	end if
+	
+	// Before the draw loop, back up the underwater yellow colour
+	GetPaletteEntry(1, 15, temp2)
+	
+	temp0 = SELECTION_CONTINUE
+	temp1 = 1
+	while temp0 < SELECTION_MAX
+		// Make the current selection highlighted
+		checkNotEqual(object.selection, temp0)
+		checkResult *= 0xE0
+		checkResult += 0xE0E000
+		SetPaletteEntry(0, 15, checkResult)
+		SetPaletteEntry(1, 15, checkResult)
+		SetPaletteEntry(2, 15, checkResult)
+		
+		DrawSpriteScreenXY(temp1, screen.xcenter, screen.ycenter)
+		temp0++
+		temp1++
+	loop
+	
+	// Restore the colours
+	SetPaletteEntry(0, 15, 0xE0E000)
+	SetPaletteEntry(1, 15, temp2)
+	SetPaletteEntry(2, 15, 0xE0E0E0)
+	
+	if object.state == PAUSE_FADEOUT
+		// The black fade-out
+		// Do note - because nothing else is being redrawn, this black rect is persisting between frames so each new frame's rect is layered atop the old one
+		// Because of that, the fade is "exponential," so to speak, so even keeping object.timer constant will still keep it fading out
+		DrawRect(0, 0, screen.xsize, screen.ysize, 0, 0, 0, object.timer)
+	end if
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("Global/Display.gif")
+	
+	SpriteFrame(-40, -32, 44, 4, 31, 46)	// 0  - Frame Edge
+	SpriteFrame(-30, -25, 61, 11, 120, 358)	// 1  - Continue
+	SpriteFrame(-28, -5, 56, 11, 189, 316)	// 2  - Restart
+	SpriteFrame(-15, 15, 29, 11, 137, 377)	// 3  - Exit
+end event
+
+
+// ========================
+// Editor Events
+// ========================
+
+event RSDKDraw
+	DrawSprite(0)
+end event
+
+
+event RSDKLoad
+	LoadSpriteSheet("Global/Display.gif")
+	SpriteFrame(-30, -5, 61, 11, 120, 358)
+	
+	SetVariableAlias(ALIAS_VAR_PROPVAL, "unused")
+end event

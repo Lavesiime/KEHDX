@@ -1,0 +1,25 @@
+// ----------------------------------
+// RSDK Project: Sonic CD
+// Script Description: Foreground Piece Object
+// Script Author: Christian Whitehead/Simon Thomley
+// Unpacked by Rubberduckycooly's script unpacker
+// ----------------------------------
+
+// ========================
+// Events
+// ========================
+
+event ObjectDraw
+	DrawSprite(object.propertyValue)
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("R5/Objects.gif")
+	SpriteFrame(-26, -4, 52, 8, 1, 225)
+	SpriteFrame(-4, -26, 8, 52, 150, 144)
+	
+	foreach (TypeName[Foreground Piece], arrayPos0, ALL_ENTITIES)
+		object[arrayPos0].drawOrder = 4
+	next
+end event

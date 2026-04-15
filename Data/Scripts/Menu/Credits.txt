@@ -1,0 +1,430 @@
+// ----------------------------------
+// RSDK Project: Knuckles' Emerald Hunt
+// Script Description: Credits Object
+// Script Author: Lave sIime
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+// Master aliases (propertyValue == 0)
+private alias object.value0 : object.timer
+private alias object.value1 : object.targetLine
+
+private alias object.value10 : object.width
+private alias object.value11 : object.height
+private alias object.value12 : object.sprX
+private alias object.value13 : object.sprY
+private alias object.value14 : object.centered
+
+private alias 0 : CREDITS_INIT
+private alias 1 : CREDITS_FADEIN
+
+private alias 10 : CREDITS_LINE
+private alias 11 : CREDITS_END
+
+// Text Info Aliases
+private alias 0 : TEXTINFO_TEXTDATA
+private alias 1 : TEXTINFO_TEXTSIZE
+private alias 2 : TEXTINFO_ROWCOUNT
+
+
+// ========================
+// Tables
+// ========================
+
+// Holds information for every letter, in the order of: sprX, sprY, width, height
+private table Credits_textInfo
+	476,  34, 14, 8 // 'A'
+	491,  34, 13, 8 // 'B'
+	476,  43, 13, 8 // 'C'
+	490,  43, 13, 8 // 'D'
+	476,  52, 13, 8 // 'E'
+	490,  52, 13, 8 // 'F'
+	476,  61, 13, 8 // 'G'
+	490,  61, 13, 8 // 'H'
+	505,  34,  5, 8 // 'I'
+	476,  70, 13, 8 // 'J'
+	490,  70, 13, 8 // 'K'
+	476,  79, 13, 8 // 'L'
+	490,  79, 13, 8 // 'M'
+	476,  88, 13, 8 // 'N'
+	490,  88, 13, 8 // 'O'
+	476,  97, 13, 8 // 'P'
+	490,  97, 14, 8 // 'Q'
+	369, 114, 13, 8 // 'R'
+	369, 123, 13, 8 // 'S'
+	369, 132, 13, 8 // 'T'
+	369, 141, 13, 8 // 'U'
+	369, 150, 13, 8 // 'V'
+	369, 159, 13, 8 // 'W'
+	369, 168, 13, 8 // 'X'
+	369, 177, 13, 8 // 'Y'
+	271, 148, 13, 8 // 'Z'
+	
+	471, 251, 13, 8 // '0'
+	504,  86,  8, 8 // '1'
+	271, 157, 13, 8 // '2'
+	204, 176, 13, 8 // '3'
+	451, 180, 13, 8 // '4'
+	465, 180, 13, 8 // '5'
+	479, 180, 13, 8 // '6'
+	493, 180, 13, 8 // '7'
+	443, 251, 13, 8 // '8'
+	457, 251, 13, 8 // '9'
+	
+	504,  43,  7, 8 // '('
+	504,  52,  7, 8 // ')'
+	504,  61,  4, 8 // '.'
+	504,  70,  6, 6 // '*'
+	504,  77,  4, 8 // ':'
+	485, 251,  9, 6 // '-'
+	495, 251, 13, 8 // '_'
+end table
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	switch object.state
+	case CREDITS_INIT
+		CallFunction(MenuControl_CInit)
+		
+		foreach (TypeName[Credits], arrayPos0, ALL_ENTITIES)
+			object[arrayPos0].priority = 0
+		next
+		
+		object[arrayPos0].priority = 1
+		
+		object.timer = 320
+		SetScreenFade(0, 0, 0, object.timer)
+		
+		// Set BG speed, 0.5 px per frame rather than the 1.0 the other Menus use
+		tileLayer[1].scrollSpeed = 0
+		hParallax[0].scrollSpeed = 0
+		
+		object.state++
+		break
+		
+	case CREDITS_FADEIN
+		if object.timer > 0
+			object.timer -= 8
+		else
+			PlayMusic(2)
+			object.state++
+		end if
+		
+		SetScreenFade(0, 0, 0, object.timer)
+		break
+		
+	case 2
+		screen.yoffset++
+		break
+		
+	case CREDITS_LINE
+		break
+	end switch
+end event
+
+
+event ObjectDraw
+	switch object.state
+	case 0
+	case 1
+	case 2
+		DrawSprite(1)
+		break
+		
+	case CREDITS_LINE
+		SetActivePalette(object.propertyValue, 0, screen.ysize)
+		
+		GetTextInfo(temp1, MENU_2, TEXTINFO_TEXTSIZE, object.targetLine, 0)
+		temp0 = 3
+		
+		// Hold on, before doing anything let's back up our current xpos first!
+		temp7 = object.xpos
+		
+		// And now, loop through the entire line
+		while temp0 < temp1
+			GetTextInfo(temp2, MENU_2, TEXTINFO_TEXTDATA, object.targetLine, temp0)
+			switch temp2
+			default
+				// Let's assume it's a valid letter and translate it into a Sprite Frame
+				temp4 = temp2
+				
+				// First, do uppercase letters
+				CheckGreater(temp2, 64)
+				temp3 = checkResult
+				CheckLower(temp2, 91)
+				temp3 &= checkResult
+				if temp3 == true
+					temp2 -= 64
+				end if
+				
+				// Then, try lowercase letters
+				CheckGreater(temp2, 96)
+				temp3 = checkResult
+				CheckLower(temp2, 123)
+				temp3 &= checkResult
+				if temp3 == true
+					temp2 -= 96
+				end if
+				
+				// Last, comes numbers
+				CheckGreater(temp2, 47)
+				temp3 = checkResult
+				CheckLower(temp2, 58)
+				temp3 &= checkResult
+				if temp3 == true
+					temp2 -= 21
+				end if
+				
+				// Special characters
+				switch temp2
+				case 40 // '('
+					temp2 = 36
+					break
+				case 41 // ')'
+					temp2 = 37
+					break
+				case 46 // '.'
+					temp2 = 38
+					break
+				case 42 // '*'
+					temp2 = 39
+					break
+				case 58 // '*'
+					temp2 = 40
+					break
+				case 45 // '-'
+					temp2 = 41
+					break
+				case 95 // '_'
+					temp2 = 42
+					break
+				end switch
+				
+				temp3 = temp2
+				
+				// Then, take away 1 since Sprite Frames have a filler not present in the table
+				temp3 -= 1
+				
+				// Since each letter's info is 4 entries, let's skip ahead
+				temp3 *= 4
+				
+				// Now, actually fetch the info
+				GetTableValue(object.sprX, temp3, Credits_textInfo)
+				temp3++
+				GetTableValue(object.sprY, temp3, Credits_textInfo)
+				temp3++
+				GetTableValue(object.width, temp3, Credits_textInfo)
+				temp3++
+				GetTableValue(object.height, temp3, Credits_textInfo)
+				temp3++
+				
+				// If it's valid, then draw
+				if temp2 != temp4
+					EditFrame(0, 0, 0, object.width, object.height, object.sprX, object.sprY)
+					DrawSprite(0)
+				end if
+				
+				// Just a little wee gap
+				object.width += 1
+				
+				// Shift it into world-space pos
+				object.width <<= 16
+				
+				// And now, add it to move to the next character's spot
+				object.xpos += object.width
+				break
+				
+			case 32 // ' '
+				// A space, just add a gap of 15 pixels
+				// (Using object.width so that it can be reverted if this space is the last character in a line)
+				object.width = 0xF0000
+				object.xpos += object.width
+				break
+				
+			// (More exceptions can be added here if needed, if you really wanna)
+			
+			end switch
+			
+			// Next letter!
+			temp0++
+		loop
+		
+		if object.centered == false
+			temp0 = object.xpos
+			temp0 -= temp7
+			temp0 >>= 1
+			object.xpos = temp7
+			object.xpos -= temp0
+			
+			object.centered = true
+		else
+			object.xpos = temp7
+		end if
+		
+		SetActivePalette(0, 0, screen.ysize)
+		break
+		
+	end switch
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("Menu/Menu.gif")
+	
+	// 0 - Placeholder text frame (knux sound test icon)
+	SpriteFrame(-16, -12, 32, 24, 162, 151)
+	
+	// 1 - Knuckles' Emerald Hunt, DX!
+	SpriteFrame(-142, -56, 284, 113, 128, 0)
+	
+	// Make sure the camera doesn't have any quams with scrolling way down
+	stage.curYBoundary1 = 0x7fff
+	stage.curYBoundary2 = 0x7fff
+	
+	// Let's set up the alt palette, too
+	// Palette bank 1 is used for Stage Select icons, so let's use pal bank 2
+	CopyPalette(0, 0, 2, 0, 256)
+	
+	// The blue version is just the green version but rotated, so let's rotate it instead of manually setting hardcoded colours (and 'cause this way is more fun :D)
+	temp0 = 208
+	while temp0 < 215
+		GetPaletteEntry(2, temp0, temp1)
+		
+		temp2 = temp1
+		temp2 &= 0xFF
+		temp2 <<= 16
+		
+		temp1 >>= 8
+		temp1 += temp2
+		
+		SetPaletteEntry(2, temp0, temp1)
+		
+		temp0++
+	loop
+	
+	arrayPos1 = -1 // masterPos
+	
+	foreach (TypeName[Credits], arrayPos0, ALL_ENTITIES)
+		arrayPos1 = arrayPos0
+	next
+	
+	// Now.. all the fun stuff!
+	LoadTextFile(MENU_2, "Data/Game/Credits.txt", false)
+	
+	// Lots of values used here, here's a list of what they mean through the loop:
+	// - arrayPos0 is the Entity Pos of the current object
+	// - temp0 is the current line
+	// - temp1 is line count       (constant through loop)
+	// - temp2 is px               (constant through loop)
+	// - temp3 is text type
+	// - temp4 is py
+	// - temp5 is text length
+	
+	arrayPos0 = arrayPos1
+	temp0 = 0
+	GetTextInfo(temp1, MENU_2, TEXTINFO_ROWCOUNT, 0, 0)
+	temp4 = object[arrayPos1].ypos
+	temp4 += 0x10000000
+	
+	while temp0 < temp1
+		GetTextInfo(temp3, MENU_2, TEXTINFO_TEXTDATA, temp0, 1) // Text type (whatever's in the brackets)
+		GetTextInfo(temp5, MENU_2, TEXTINFO_TEXTSIZE, temp0, 0) // Line
+		
+		// Make sure the line isn't empty...
+		if temp5 > 2
+			// Yup, now this is a line with contents!
+			
+			// Jump to its type (whatever's inside the brackets)
+			switch temp3
+			case 48 // '0'
+			case 49 // '1'
+			case 50 // '2'
+			case 51 // '3'
+			case 52 // '4'
+			case 53 // '5'
+			case 54 // '6'
+			case 55 // '7'
+			case 56 // '8'
+			case 57 // '9'
+				// Numerical, where the number dennotes text type
+				
+				// First, turn it into its actual number
+				temp3 -= 48 // temp3 - '0'
+				
+				ResetObjectEntity(arrayPos0, TypeName[Credits], temp3, temp2, temp4)
+				object[arrayPos0].state = CREDITS_LINE
+				object[arrayPos0].targetLine = temp0
+				object[arrayPos0].priority = 5
+				
+				temp4 += 0x100000
+				
+				while object[arrayPos0].type > TypeName[Blank Object]
+					arrayPos0++
+				loop
+				break
+				
+			case 33 // '!'
+				// Create an end marker
+				ResetObjectEntity(arrayPos0, TypeName[Credits], 0, temp2, temp4)
+				object[arrayPos0].state = CREDITS_END
+				object[arrayPos0].priority = 5
+				
+				temp4 += 0x100000
+				
+				while object[arrayPos0].type > TypeName[Blank Object]
+					arrayPos0++
+				loop
+				break
+				
+			case 43 // '+'
+				// Go down by the given number of pixels
+				GetTextInfo(temp3, MENU_2, TEXTINFO_TEXTDATA, temp0, 2)
+				temp3 -= 48 // temp3 - '0'
+				temp3 <<= 16
+				temp4 += temp3
+				break
+				
+			case 45 // '-'
+				// Go back up by the given number of pixels
+				GetTextInfo(temp3, MENU_2, TEXTINFO_TEXTDATA, temp0, 2)
+				temp3 -= 48 // temp3 - '0'
+				temp3 <<= 16
+				temp4 -= temp3
+				break
+				
+			default
+				// uhoh
+				break
+				
+			end switch
+		else
+			// Emtpy line, let's skip a few spaces
+			temp4 += 0x400000
+		end if
+		
+		temp0++
+	loop
+end event
+
+
+// ========================
+// Editor Events
+// ========================
+
+event RSDKDraw
+	DrawSprite(0)
+end event
+
+
+event RSDKLoad
+	LoadSpriteSheet("KEHMenu/Menu.gif")
+	SpriteFrame(-50, -8, 100, 16, 128, 154)
+	
+	SetVariableAlias(ALIAS_VAR_PROPVAL, "unused")
+end event

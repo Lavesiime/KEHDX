@@ -1,0 +1,414 @@
+// ----------------------------------
+// RSDK Project: Knuckles' Emerald Hunt
+// Script Description: Options Object
+// Script Author: Lave sIime
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+private alias object.value0 : object.timer
+private alias object.value1 : object.master
+private alias object.value2 : object.buttonFunc
+private alias object.value3 : object.selection
+
+private alias object.value20 : object.drawPos.x
+private alias object.value21 : object.drawPos.y
+private alias object.value22 : object.drawWidth
+private alias object.value23 : object.drawHeight
+private alias object.value24 : object.drawColour.r
+private alias object.value25 : object.drawColour.g
+private alias object.value26 : object.drawColour.b
+
+// States
+private alias 0 : OPTIONS_M_INIT
+private alias 1 : OPTIONS_M_FADEIN
+private alias 2 : OPTIONS_M_MAIN
+private alias 3 : OPTIONS_M_EXIT
+private alias 4 : OPTIONS_B_BUTTON
+
+private alias saveRAM[200] : saved.radar
+private alias saveRAM[201] : saved.radarstyle
+private alias saveRAM[202] : saved.character
+
+
+// ========================
+// Function Declarations
+// ========================
+
+// Button activation functions
+reserve function Options_Button_Character
+reserve function Options_Button_Radar
+reserve function Options_Button_SoundTest
+reserve function Options_Button_MusicSwitch
+reserve function Options_Button_RadarStyle
+
+
+// ========================
+// Function Definitions
+// ========================
+
+-// Do note that actually saving isn't done here in any of these functions, instead the game saves only upon exiting the menu
+
+private function Options_Button_Character
+	CheckEqual(options.physicalControls, false)
+	checkResult |= keyPress[0].left
+	checkResult |= keyPress[0].right
+	checkResult |= keyPress[0].start
+	
+	if checkResult == true
+		saved.character ^= 1
+	end if
+end function
+
+
+private function Options_Button_Radar
+	CheckEqual(options.physicalControls, false)
+	checkResult |= keyPress[0].start
+	keyPress[0].right |= checkResult
+	
+	if keyPress[0].right == true
+		saved.radar++
+		saved.radar %= 3
+	end if
+
+	if keyPress[0].left == true
+		saved.radar--
+		if saved.radar < 0
+			saved.radar = 2
+		end if
+	end if
+end function
+
+
+private function Options_Button_SoundTest
+	// KEHDX TODO: unimplemented
+end function
+
+
+private function Options_Button_MusicSwitch
+	// KEHDX TODO: unimplemented
+end function
+
+
+private function Options_Button_RadarStyle
+	CheckEqual(options.physicalControls, false)
+	checkResult |= keyPress[0].left
+	checkResult |= keyPress[0].right
+	checkResult |= keyPress[0].start
+	
+	if checkResult == true
+		saved.radarstyle ^= 1
+	end if
+end function
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	switch object.state
+	case OPTIONS_M_INIT
+		CallFunction(MenuControl_CInit)
+		
+		object.timer = 320
+		
+		tileLayer[1].scrollSpeed = -0x10000
+		hParallax[0].scrollSpeed = -0x10000
+		
+		if options.physicalControls == false
+			// If using touch, then don't have a default selection
+			// (also starting with the cursor having already selected something will cause a "tap" to be seen, which isn't too good...)
+			
+			object.selection = SELECTION_NULL
+		end if
+		
+		SetScreenFade(0, 0, 0, object.timer)
+		object.state++
+		break
+
+	case OPTIONS_M_FADEIN
+		if object.timer > 0
+			object.timer -= 16
+		else
+			PlayMusic(0)
+			object.state++
+		end if
+		
+		SetScreenFade(0, 0, 0, object.timer)
+		break
+
+	case OPTIONS_M_MAIN
+		if options.physicalControls == true
+			if keyPress[0].buttonB == true
+				object.state = OPTIONS_M_EXIT
+				return
+			end if
+			
+			if touchscreen[0].down == true
+				options.physicalControls = false
+				object.selection = SELECTION_NULL
+				return
+			end if
+			
+			temp0 = object.selection
+			
+			object.selection -= keyPress[0].up
+			object.selection += keyPress[0].down
+			
+			checkResult = false
+			foreach (object.type, arrayPos0, ACTIVE_ENTITIES)
+				if object[arrayPos0].propertyValue == object.selection
+					checkResult = true
+				end if
+			next
+			
+			if checkResult == false
+				object.selection = temp0
+			end if
+			
+			foreach (object.type, arrayPos0, ACTIVE_ENTITIES)
+				if object[arrayPos0].propertyValue == object.selection
+					CallFunction(object[arrayPos0].buttonFunc)
+				end if
+			next
+		else
+			// Check if we released a button
+			CheckTouchRect(0, 0, screen.xsize, screen.ysize)
+			if checkResult == TOUCHINPUT_NULL
+				if object.selection > SELECTION_NULL
+					foreach (object.type, arrayPos0, ACTIVE_ENTITIES)
+						if object[arrayPos0].propertyValue == object.selection
+							CallFunction(object[arrayPos0].buttonFunc)
+							object.selection = SELECTION_NULL
+							return
+						end if
+					next
+				end if
+			end if
+			
+			options.physicalControls = keyPress[0].down
+			options.physicalControls |= keyPress[0].up
+			options.physicalControls |= keyPress[0].left
+			options.physicalControls |= keyPress[0].right
+			options.physicalControls |= keyPress[0].buttonA
+			options.physicalControls |= keyPress[0].buttonB
+			options.physicalControls |= keyPress[0].buttonC
+			
+			if options.physicalControls == true
+				object.selection = 0
+				
+				if keyPress[0].buttonB == true
+					object.state = OPTIONS_M_EXIT
+				end if
+			end if
+		end if
+		break
+		
+	case OPTIONS_M_EXIT
+		if object.timer < 256
+			object.timer += 8
+			music.volume -= 2
+			SetScreenFade(0, 0, 0, object.timer)
+		else
+			WriteSaveRAM()
+			
+			foreach (object.type, arrayPos0, ACTIVE_ENTITIES)
+				object[arrayPos0].priority = 5
+			next
+			
+			CreateTempObject(TypeName[Menu Control], 0, 0, 0)
+			object[tempObjectPos].priority = 1
+			
+			StopMusic()
+			SetScreenFade(0, 0, 0, 0xFF)
+		end if
+		break
+	
+	case OPTIONS_B_BUTTON
+		arrayPos0 = object.master
+		
+		CheckNotEqual(object[arrayPos0].state, OPTIONS_M_MAIN)
+		checkResult |= options.physicalControls
+		if checkResult == false
+			temp0 = object.ixpos
+			temp0 -= screen.xoffset
+			temp0 -= 139 // object.drawWidth / 2
+			
+			temp1 = object.iypos
+			temp1 -= screen.yoffset
+			
+			temp2 = temp0
+			temp2 += object.drawWidth
+			temp2 += 3
+			
+			temp3 = temp1
+			temp3 += object.drawHeight
+			temp3 += 3
+			
+			CheckTouchRect(temp0, temp1, temp2, temp3)
+			if checkResult > TOUCHINPUT_NULL
+				object[arrayPos0].selection = object.propertyValue
+			end if
+		end if
+		break
+		
+	end switch
+end event
+
+
+event ObjectDraw
+	if object.state == OPTIONS_B_BUTTON
+		arrayPos0 = object.master
+		
+		object.drawPos.x = object.ixpos
+		object.drawPos.x -= screen.xoffset
+		object.drawPos.x -= 139 // object.drawWidth / 2
+		object.drawPos.y = object.iypos
+		object.drawPos.y -= screen.yoffset
+		if object.propertyValue == object[arrayPos0].selection
+			menu1.selection = 2
+			object.drawColour.g = 0
+		else
+			menu1.selection = -1
+			object.drawColour.g = 0xE0
+		end if
+		CallFunction(MenuControl_DrawBox)
+		
+		switch object.propertyValue
+		case 0
+			EditMenuEntry(MENU_1, "*@@PLAYER SELECT@@*", 0, false)
+			
+			switch saved.character
+			case 0
+				EditMenuEntry(MENU_1, "KNUCKLES", 2, true)
+				break
+				
+			case 1
+				EditMenuEntry(MENU_1, "TIKAL", 2, true)
+				break
+				
+			end switch
+			break
+			
+		case 1
+			EditMenuEntry(MENU_1, "*@@RADAR@@*", 0, false)
+			
+			switch saved.radar
+			case 0
+				EditMenuEntry(MENU_1, "@@ON@@", 2, true)
+				break
+				
+			case 1
+				EditMenuEntry(MENU_1, "OFF", 2, true)
+				break
+
+			case 2
+				EditMenuEntry(MENU_1, "ARROWS", 2, true)
+				break
+				
+			end switch
+			break
+			
+		case 2
+			EditMenuEntry(MENU_1, "*@@SOUND TEST@@*", 0, false)
+			EditMenuEntry(MENU_1, "NOT AVAILABLE", 2, true)
+			break
+			
+		case 3
+			EditMenuEntry(MENU_1, "*@@MUSIC SWITCH@@*", 0, false)
+			EditMenuEntry(MENU_1, "NOT AVAILABLE", 2, true)
+			break
+			
+		case 4
+			EditMenuEntry(MENU_1, "*@@RADAR SPRITES@@*", 0, false)
+			switch saved.radarstyle
+			case 0
+				EditMenuEntry(MENU_1, "NEW", 2, true)
+				break
+				
+			case 1
+				EditMenuEntry(MENU_1, "OLD", 2, true)
+				break
+				
+			end switch
+			break
+			
+		end switch
+		
+		object.drawPos.x += 139 // object.drawWidth / 2
+		object.drawPos.y += 9
+		
+		DrawMenu(MENU_1, object.drawPos.x, object.drawPos.y)
+	end if
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("KEHMenu/Menu.gif")
+	
+	// Touch control Frames
+	SpriteFrame(-20, -10, 40, 20, 85, 105) // 0 - Back, Blue
+	SpriteFrame(-20, -10, 40, 20, 85, 125) // 1 - Back, Red
+	
+	SpriteFrame(-175, 12, 20, 20, 85, 65)  // 2 - Left, Blue
+	
+	SetMusicTrack("Options.ogg", 0, true)
+	
+	SetupMenu(MENU_1, 0, 1, 2)
+	
+	// (Placeholder text)
+	AddMenuEntry(MENU_1, "*@@HEADING PLACEHOLDER@@*", false)
+	AddMenuEntry(MENU_1, "@", false)
+	AddMenuEntry(MENU_1, "SETTING PLACEHOLDER", true)
+	
+	arrayPos1 = -1 // masterPos
+	
+	foreach (TypeName[Options], arrayPos0, ALL_ENTITIES)
+		switch object[arrayPos0].propertyValue
+		case 0
+			// Add the Master object to the control object list
+			SetTableValue(object[arrayPos0].entityPos, 3, MenuControl_controls)
+			
+			arrayPos1 = arrayPos0
+			break
+			
+		case 1
+		case 2
+		case 3
+		case 4
+		case 5
+			object[arrayPos0].state = OPTIONS_B_BUTTON
+			object[arrayPos0].master = arrayPos1
+			object[arrayPos0].drawWidth = 279
+			object[arrayPos0].drawHeight = 39
+			object[arrayPos0].drawColour.r = 0xE0
+			object[arrayPos0].drawColour.b = 0x00
+			object[arrayPos0].propertyValue--
+			
+			object[arrayPos0].buttonFunc = Options_Button_Character
+			object[arrayPos0].buttonFunc += object[arrayPos0].propertyValue
+			break
+			
+		end switch
+	next
+end event
+
+
+// ========================
+// Editor Events
+// ========================
+
+event RSDKDraw
+	DrawSprite(0)
+end event
+
+
+event RSDKLoad
+	LoadSpriteSheet("KEHMenu/Menu.gif")
+	SpriteFrame(-50, -8, 100, 16, 128, 154)
+	
+	SetVariableAlias(ALIAS_VAR_PROPVAL, "unused")
+end event

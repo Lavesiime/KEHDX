@@ -1,0 +1,205 @@
+// ----------------------------------
+// RSDK Project: Sonic 2
+// Script Description: SHC Splash Object
+// Original Script Author: Lave sIime
+// KEXDX Modifications: MainMemory
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+// States
+private alias 0 : SPLASH_INIT
+private alias 1 : SPLASH_FADEIN
+private alias 2 : SPLASH_MAIN
+private alias 3 : SPLASH_FADEOUT
+
+
+// ========================
+// Function Declarations
+// ========================
+
+reserve function Splash_NextPhase
+
+
+// ========================
+// Tables
+// ========================
+
+// The sprite ID to use for every frame
+private table Splash_anim_sprites
+	2,  1, 0, 1, 2, 1, 0, 2, 0, 1, 2, 0, 2, 1, 0, 1, 0, 1, 2, 1, 0, 2,  0, 2, 1, 0, 2, 0, 1, 2, 0, 2, 0, 2, 1, 0, 1,  0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 2, 0, 2, 1, 0, 1, 2, 1, 2, 1, 0, 2, 0, 1, 0, 1, 2, 1, 2, 1, 0, 2, 0, 1,   2
+end table
+
+// How long every frame's durration is
+private table Splash_anim_times
+	64, 1, 1, 1, 1, 1, 2, 1, 2, 1, 3, 1, 4, 3, 1, 2, 3, 2, 4, 3, 3, 4, 64, 4, 2, 3, 2, 3, 2, 2, 3, 2, 3, 2, 2, 3, 2, 64, 8, 8, 8, 8, 8, 8, 8, 2, 3, 2, 2, 3, 2, 2, 3, 2, 2, 2, 2, 2, 3, 2, 3, 2, 3, 2, 2, 2, 2, 2, 3, 2, 3, 2, 360
+end table
+
+
+// ========================
+// Function Definitions
+// ========================
+
+private function Splash_NextPhase
+	object.type = TypeName[Blank Object]
+	
+	// Go to the Main Menu now
+	CreateTempObject(TypeName[Menu Control], 0, 0, 0)
+	object[tempObjectPos].priority = 1
+end function
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	// As cool as it looks, allow the player to skip the splash if they so desire
+	temp0 = keyPress[0].start
+	temp0 |= touchScreen[0].down
+	CheckGreater(object.state, SPLASH_FADEIN)
+	temp0 &= checkResult
+	CheckLower(object.state, SPLASH_FADEOUT)
+	temp0 &= checkResult
+	
+	if temp0 == true
+		// Skip to fade-out
+		
+		object.animationTimer = 0
+		object.state = SPLASH_FADEOUT
+		
+		// KEHDX - K Logo is intentionally left alone, keep it frozen where it was
+	end if
+	
+	switch object.state
+	case SPLASH_INIT
+		object.animationTimer = 320
+		
+		// KEHDX - values for the K Logo
+		object.rotation = 4
+		object.scale = 0x1000
+		
+		SetScreenFade(0, 0, 0, object.animationTimer)
+		object.state++
+		// [Fallthrough]
+	case SPLASH_FADEIN
+		if object.animationTimer > 0
+			object.animationTimer -= 8
+		else
+			object.state++
+		end if
+		
+		SetScreenFade(0, 0, 0, object.animationTimer)
+		break
+		
+	case SPLASH_MAIN
+		GetTableValue(temp0, object.frame, Splash_anim_times)
+		
+		object.animationTimer++
+		if object.animationTimer == temp0
+			object.frame++
+			object.animationTimer = 0
+		end if
+		
+		if object.animationTimer == 0
+			switch object.frame
+			case 1
+				// When the logo first starts flashing, play the jingle
+				PlayMusic(15)
+				break
+				
+			case 40
+				PlaySfx(SfxName[Sonic], false)
+				break
+				
+			case 72
+				// Once we reach the last frame, start fading out
+				object.state++
+				break
+				
+			end switch
+		end if
+		
+		// KEHDX - Update the K Logo's movement
+		if object.frame >= 37
+			if object.scale > 0x200
+				object.scale -= 0x80
+				if object.scale == 0x200
+					PlaySfx(SfxName[Crusher], false)
+					
+					// Replace the blue splash colours with the Knuckles red ones
+					CopyPalette(7, 32, 7, 0, 16)
+				end if
+			end if
+		end if
+		break
+		
+	case SPLASH_FADEOUT
+		if object.animationTimer < 256
+			object.animationTimer += 8
+			SetScreenFade(0, 0, 0, object.animationTimer)
+		else
+			Callfunction(Splash_NextPhase)
+			StopMusic()
+			SetScreenFade(0, 0, 0, 255)
+		end if
+		break
+		
+	end switch
+end event
+
+
+event ObjectDraw
+	SetActivePalette(7, 0, screen.ysize)
+	
+	DrawRect(0, 0, screen.xsize, screen.ysize, 0, 0, 0, 255)
+	GetTableValue(temp0, object.frame, Splash_anim_sprites)
+	DrawSpriteScreenXY(temp0, screen.xcenter, screen.ycenter)
+	
+	// KEHDX - K Logo, dropping in
+	if object.frame >= 37
+		DrawSpriteScreenFX(3, FX_ROTOZOOM, screen.xcenter, 102)
+	end if
+	
+	SetActivePalette(0, 0, screen.ysize)
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("Menu/Splash.gif")
+	
+	// Splash Frames
+	SpriteFrame(-160, -120, 320, 240, 0, 0)
+	SpriteFrame(-160, -120, 320, 240, 0, 240)
+	SpriteFrame(-160, -120, 320, 240, 0, 480)
+	
+	// KEHDX - K Logo Frame
+	SpriteFrame(-124, -21, 248, 42, 0, 720)
+	
+	// Load our custom palette into bank 7, to avoid overlap with existing palettes
+	LoadPalette("Splash.act", 7, 0, 0, 47)
+	
+	// The jingle is also at the end of the list, to avoid overlap
+	SetMusicTrack("Splash.ogg", 15, false)
+end event
+
+
+// ========================
+// Editor Events
+// ========================
+
+event RSDKDraw
+	DrawSprite(0)
+	DrawSprite(1)
+end event
+
+
+event RSDKLoad
+	LoadSpriteSheet("Menu/Splash.gif")
+	SpriteFrame(-160, -120, 320, 240, 0, 0)
+	SpriteFrame(-124, -21, 248, 42, 0, 720)
+	
+	SetVariableAlias(ALIAS_VAR_PROPVAL, "unused")
+end event

@@ -1,0 +1,222 @@
+// ----------------------------------
+// RSDK Project: Sonic 2
+// Script Description: Tube Switch Object
+// Script Author: Christian Whitehead/Simon Thomley
+// Unpacked by Rubberduckycooly's script unpacker
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+private alias 0 : TUBESWITCH_L_ENTRY
+private alias 1 : TUBESWITCH_R_ENTRY
+private alias 2 : TUBESWITCH_UNSTICK
+private alias 3 : TUBESWITCH_CONV_D
+private alias 4 : TUBESWITCH_CONV_U
+
+// Player Aliases
+private alias object.state : player.state
+private alias object.xpos : player.xpos
+private alias object.ypos : player.ypos
+private alias object.xvel : player.xvel
+private alias object.yvel : player.yvel
+private alias object.speed : player.speed
+private alias object.direction : player.direction
+private alias object.gravity : player.gravity
+private alias object.animation : player.animation
+private alias object.collisionMode : player.collisionMode
+
+private alias object.value1  : player.timer
+private alias object.value5  : player.rollAnimationSpeed
+private alias object.value34 : player.collisionDisabled
+
+// Reserved object slots
+private alias 10 : SLOT_ZONESETUP
+
+// Conveyor Belt Directions
+private alias 0 : CONVEYOR_RIGHT
+private alias 3 : CONVEYOR_LEFT
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+		if player[currentPlayer].collisionDisabled == true
+			// Player should collide with stuff while in a tube
+			player[currentPlayer].collisionDisabled = false
+		end if
+
+		CheckEqual(player[currentPlayer].state, Player_State_Death)
+		temp0 = checkResult
+		CheckEqual(player[currentPlayer].state, Player_State_LedgePullUp)
+		temp0 |= checkResult
+		if temp0 == false
+			BoxCollisionTest(C_TOUCH, object.entityPos, -16, -16, 16, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+			if checkResult == true
+				switch object.propertyValue
+				case TUBESWITCH_L_ENTRY
+					if player[currentPlayer].state != Player_State_Climb
+						if player[currentPlayer].yvel < 0
+							player[currentPlayer].yvel = 0
+						end if
+						
+						if player[currentPlayer].xvel > 0
+							if player[currentPlayer].animation != ANI_JUMPING
+								if player[currentPlayer].state != Player_State_TubeRoll
+									PlaySfx(SfxName[Rolling], false)
+								end if
+							end if
+
+							if player[currentPlayer].state == Player_State_GlideLeft
+								FlipSign(player[currentPlayer].speed)
+							end if
+
+							player[currentPlayer].direction = FACING_RIGHT
+							player[currentPlayer].state 	= Player_State_TubeRoll
+							player[currentPlayer].animation = ANI_JUMPING
+						else
+							if player[currentPlayer].gravity == GRAVITY_GROUND
+								if player[currentPlayer].xvel > -0x20000
+									player[currentPlayer].speed = -0x20000
+								end if
+							end if
+
+							player[currentPlayer].state 	= Player_State_Roll
+							player[currentPlayer].animation = ANI_JUMPING
+						end if
+					end if
+					break
+
+				case TUBESWITCH_R_ENTRY
+					if player[currentPlayer].state != Player_State_Climb
+						if player[currentPlayer].yvel < 0
+							player[currentPlayer].yvel = 0
+						end if
+						
+						if player[currentPlayer].xvel < 0
+							if player[currentPlayer].animation != ANI_JUMPING
+								if player[currentPlayer].state != Player_State_TubeRoll
+									PlaySfx(SfxName[Rolling], false)
+								end if
+							end if
+
+							if player[currentPlayer].state == Player_State_GlideLeft
+								FlipSign(player[currentPlayer].speed)
+							end if
+
+							player[currentPlayer].direction = FACING_LEFT
+							player[currentPlayer].state 	= Player_State_TubeRoll
+							player[currentPlayer].animation = ANI_JUMPING
+						else
+							if player[currentPlayer].gravity == GRAVITY_GROUND
+								if player[currentPlayer].xvel < 0x20000
+									player[currentPlayer].speed = 0x20000
+								end if
+							end if
+							
+							player[currentPlayer].state 	= Player_State_Roll
+							player[currentPlayer].animation = ANI_JUMPING
+						end if
+					end if
+					break
+					
+				case TUBESWITCH_UNSTICK
+					player[currentPlayer].gravity = GRAVITY_AIR
+					player[currentPlayer].collisionMode = CMODE_FLOOR
+					player[currentPlayer].xvel = 0
+					player[currentPlayer].speed = 0
+					break
+					
+				// KEHDX - currently you can glide out of a conveyor push, do we wanna keep this?
+					
+				case TUBESWITCH_CONV_D
+					if object[SLOT_ZONESETUP].direction == CONVEYOR_RIGHT
+						if player[currentPlayer].ypos < object.ypos
+							if player[currentPlayer].state != Player_State_Static
+								PlaySfx(SfxName[Rolling], false)
+							end if
+							
+							player[currentPlayer].state = Player_State_Static
+							player[currentPlayer].animation = ANI_JUMPING
+							player[currentPlayer].rollAnimationSpeed = 240
+							player[currentPlayer].speed = 0
+							player[currentPlayer].timer = 0
+							player[currentPlayer].xpos = object.xpos
+							player[currentPlayer].xvel = 0
+							player[currentPlayer].yvel = 0xA0000
+						end if
+					else
+						if player[currentPlayer].state == Player_State_Static
+#platform: USE_STANDALONE
+							player[currentPlayer].state = Player_State_Air
+#endplatform
+#platform: USE_ORIGINS
+							player[currentPlayer].state = Player_State_Air_NoDropDash
+#endplatform
+						end if
+					end if
+					break
+					
+				case TUBESWITCH_CONV_U
+					if object[SLOT_ZONESETUP].direction == CONVEYOR_LEFT
+						if player[currentPlayer].ypos > object.ypos
+							if player[currentPlayer].State != Player_State_Static
+								PlaySfx(SfxName[Rolling], false)
+							end if
+							
+							player[currentPlayer].state = Player_State_Static
+							player[currentPlayer].animation = ANI_JUMPING
+							player[currentPlayer].rollAnimationSpeed = 240
+							player[currentPlayer].speed = 0
+							player[currentPlayer].timer = 0
+							player[currentPlayer].xpos = object.xpos
+							player[currentPlayer].xvel = 0
+							player[currentPlayer].yvel = -0x80000
+						end if
+					else
+						if player[currentPlayer].state == Player_State_Static
+#platform: USE_STANDALONE
+							player[currentPlayer].state = Player_State_Air
+#endplatform
+#platform: USE_ORIGINS
+							player[currentPlayer].state = Player_State_Air_NoDropDash
+#endplatform
+						end if
+					end if
+					break
+					
+				end switch
+			end if
+		end if
+	next
+end event
+
+
+event ObjectDraw
+	//if player[0].type == TypeName[Debug Mode]
+	if stage.debugMode == true
+		DrawSpriteFX(0, FX_INK, object.xpos, object.ypos)
+		DrawSpriteFX(1, FX_INK, object.xpos, object.ypos)
+		DrawSpriteFX(2, FX_INK, object.xpos, object.ypos)
+		DrawSpriteFX(3, FX_INK, object.xpos, object.ypos)
+	end if
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("Global/Display.gif")
+	SpriteFrame(-16, -16, 16, 16, 168, 18)
+	SpriteFrame(0, -16, 16, 16, 168, 18)
+	SpriteFrame(-16, 0, 16, 16, 168, 18)
+	SpriteFrame(0, 0, 16, 16, 168, 18)
+	
+	foreach (TypeName[Tube Switch], arrayPos0, ALL_ENTITIES)
+		object[arrayPos0].inkEffect = INK_BLEND
+		object[arrayPos0].drawOrder = 5
+	next
+end event
+

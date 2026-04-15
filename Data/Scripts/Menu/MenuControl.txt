@@ -1,0 +1,281 @@
+// ----------------------------------
+// RSDK Project: Knuckles' Emerald Hunt
+// Script Description: Menu Control Object
+// Script Author: Lave sIime
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+// Shared Master Object Values
+private alias object.value3 : object.selection
+
+// Box Aliases, see MenuControl_DrawBox
+private alias object.value20 : object.drawPos.x
+private alias object.value21 : object.drawPos.y
+private alias object.value22 : object.drawWidth
+private alias object.value23 : object.drawHeight
+private alias object.value24 : object.drawColour.r
+private alias object.value25 : object.drawColour.g
+private alias object.value26 : object.drawColour.b
+
+// Selection Aliases
+public alias -1 : SELECTION_NULL
+
+// Touch Input Aliases
+public alias -1 : TOUCHINPUT_NULL
+
+
+// ========================
+// Function Declarations
+// ========================
+
+// All these functions aren't directly used by a Menu Control object;
+// rather, they're hosted here to be reused across several objects in the scene
+reserve function MenuControl_CInit
+reserve function MenuControl_DrawBox
+
+
+// ========================
+// Tables
+// ========================
+
+public table MenuControl_controls[32]
+
+
+// ========================
+// Function Definitions
+// ========================
+
+public function MenuControl_CInit
+	// "Common" Init for lack of a better title, this function is called by various master objects for shared initialisation stuff
+	
+	screen.xoffset = object.ixpos
+	screen.xoffset -= screen.xcenter
+	
+	screen.yoffset = object.iypos
+	screen.yoffset &= 0xFFFFFF80 // align the camera to the top of the nearest chunks
+	
+	// Set all of the following objects to active (including the current one)
+	arrayPos0 = object.entityPos
+	while object[arrayPos0].type == object.type
+		object[arrayPos0].priority = 1
+		
+		arrayPos0++
+	loop
+	
+	// If using touch then don't have a default selection, otherwise start with option 0
+	if options.physicalControls == false
+		object.selection = SELECTION_NULL
+	else
+		object.selection = 0
+	end if
+end function
+
+
+public function MenuControl_DrawBox
+	// The tin's right, this draws a selection box
+	
+	// Preconditions:
+	// - object.drawPos.x is set to the screen-space X position to draw the box
+	// - object.drawPos.y is set to the screen-space Y position to draw the box
+	// - object.drawWidth is the width for the box to be (not including shadow)
+	// - object.drawHeight is how tall the box should be (not including shadow)
+	// - object.drawColour.[rgb] is set to the colour the box should be
+	//   - Lower 8 bits of each var (0xFF) are main box, 8 bits above that (0xFF00) are shadow colour
+	
+	temp1 = object.drawPos.y
+	temp1 += object.drawHeight
+	
+	temp2 = object.drawPos.x
+	temp2 += object.drawWidth
+	
+	// To make the ends meet, don't want an empty corner!
+	object.drawHeight++
+	
+	// First do the box's Shadow, 2px off from the main box
+	object.drawPos.x += 2
+	object.drawPos.y += 2
+	temp1 += 2
+	temp2 += 2
+	
+	temp3 = object.drawColour.r
+	temp4 = object.drawColour.g
+	temp5 = object.drawColour.b
+
+	object.drawColour.r >>= 8
+	object.drawColour.g >>= 8
+	object.drawColour.b >>= 8
+
+	object.drawColour.r &= 0xFF
+	object.drawColour.g &= 0xFF
+	object.drawColour.b &= 0xFF
+	
+	// TL -> TR
+	DrawRect(object.drawPos.x, object.drawPos.y, object.drawWidth, 1, object.drawColour.r, object.drawColour.g, object.drawColour.b, 255)
+	
+	// TL -> BL
+	DrawRect(object.drawPos.x, object.drawPos.y, 1, object.drawHeight, object.drawColour.r, object.drawColour.g, object.drawColour.b, 255)
+	
+	// BL -> BR
+	DrawRect(object.drawPos.x, temp1, object.drawWidth, 1, object.drawColour.r, object.drawColour.g, object.drawColour.b, 255)
+	
+	// TR -> BR
+	DrawRect(temp2, object.drawPos.y, 1, object.drawHeight, object.drawColour.r, object.drawColour.g, object.drawColour.b, 255)
+	
+	// Now, move back and do the actual main box
+	object.drawPos.x -= 2
+	object.drawPos.y -= 2
+	temp1 -= 2
+	temp2 -= 2
+	
+	object.drawColour.r = temp3
+	object.drawColour.g = temp4
+	object.drawColour.b = temp5
+
+	object.drawColour.r &= 0xFF
+	object.drawColour.g &= 0xFF
+	object.drawColour.b &= 0xFF
+
+	// TL -> TR
+	DrawRect(object.drawPos.x, object.drawPos.y, object.drawWidth, 1, object.drawColour.r, object.drawColour.g, object.drawColour.b, 255)
+	
+	// TL -> BL
+	DrawRect(object.drawPos.x, object.drawPos.y, 1, object.drawHeight, object.drawColour.r, object.drawColour.g, object.drawColour.b, 255)
+	
+	// BL -> BR
+	DrawRect(object.drawPos.x, temp1, object.drawWidth, 1, object.drawColour.r, object.drawColour.g, object.drawColour.b, 255)
+	
+	// TR -> BR
+	DrawRect(temp2, object.drawPos.y, 1, object.drawHeight, object.drawColour.r, object.drawColour.g, object.drawColour.b, 255)
+	
+	// And now shift back a bit, undo the change from above
+	object.drawHeight--
+end function
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	GetTableValue(arrayPos0, object.propertyValue, MenuControl_controls)
+	object[arrayPos0].priority = 1
+	object[arrayPos0].state = 0
+	camera[0].target = arrayPos0
+	Print("Transitioning scene: ", false, false)
+	Print(arrayPos0, true, true)
+	
+	object.type = 0
+end event
+
+
+event ObjectDraw
+	SetScreenFade(0, 0, 0, 255)
+end event
+
+
+event ObjectStartup
+	options.physicalControls = true
+	options.touchControls = false
+	
+	screen[0].cameraEnabled = false
+	SetScreenCount(1)
+	
+	foreach (TypeName[Menu Control], arrayPos0, ALL_ENTITIES)
+		object[arrayPos0].type = TypeName[Blank Object]
+		arrayPos1 = arrayPos0
+		arrayPos1++
+		SetTableValue(object[arrayPos1].entityPos, object[arrayPos0].propertyValue, MenuControl_controls)
+	next
+	
+	// Make everything inactive on startup
+	// (Can't use GROUP_ALL with ALL_ENTITIES so we gotta do a good 'ol normal loop instead)
+	arrayPos0 = 32
+	while arrayPos0 < 1024
+		object[arrayPos0].priority = 5
+		arrayPos0++
+	loop
+	
+	// temp - single-use global var is kinda dumb, 
+	if menu.splashDisplayed == false
+		// First time going to the title screen on this boot of the game, so let's look at all the fancy stuff and stuff
+		arrayPos0 = 16
+		
+		// Let's make sure to skip 'em next time, though!
+		menu.splashDisplayed = true
+	else
+		// We've seen the Sega screen and everything already, let's skip it this time
+		arrayPos0 = 0
+	end if
+	
+	// Grab the starting menu and make it active
+	GetTableValue(arrayPos1, arrayPos0, MenuControl_controls)
+	object[arrayPos1].priority = 1
+	object[arrayPos1].state = 0
+	camera[0].target = arrayPos1
+end event
+
+
+// ========================
+// Editor Events
+// ========================
+
+event RSDKDraw
+	DrawSprite(0)
+end event
+
+
+event RSDKLoad
+	LoadSpriteSheet("KEHMenu/Menu.gif")
+	SpriteFrame(-8, -8, 16, 16, 0, 104)
+	
+	SetVariableAlias(ALIAS_VAR_PROPVAL, "unused")
+end event
+
+
+// ========================
+// Editor Helpers
+// ========================
+
+// Just some extra stuff for making the menus look pretty in the editor too
+
+reserve function EditorHelpers_DrawHitbox
+
+
+public function EditorHelpers_DrawHitbox
+	
+#platform: EDITOR
+	
+	// This function is called in order to draw an object's hitbox, as a white 
+	// editor.drawingOverlay isn't set here, that's to be determined by the object calling this function
+	
+	// Preconditions:
+	// - object.xpos and object.ypos are the position for the hitbox to be centered around
+	// - temp0 is the left hitbox size
+	// - temp1 is the top hitbox size
+	// - temp2 is the right hitbox size
+	// - temp3 is the bottom hitbox size
+	//  - Hitboxes aren't world-space, to be 1:1 values instead (ie just a basic "-15" instead of "-0xF0000")
+	
+	// Get the base 1:1 position of the object
+	temp4 = object.ixpos
+	temp5 = object.iypos
+	
+	// Move to its top left corner
+	temp4 -= temp0
+	temp5 -= temp1
+	
+	// Get the hitbox's total width and height
+	temp2 += temp0
+	temp3 += temp1
+	
+	temp4 <<= 16
+	temp5 <<= 16
+	
+	DrawRectOutline(temp4, temp5, temp2, temp3, 255, 255, 0, 255)
+	
+#endplatform
+	
+end function

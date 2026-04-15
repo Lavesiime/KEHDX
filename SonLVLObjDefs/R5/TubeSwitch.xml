@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ObjDef xmlns="http://www.sonicretro.org" Image="icon" Debug="true">
+  <Images>
+    <ImageFromSheet id="icon" sheet="Global/Display.gif" sourcex="168" sourcey="18" width="16" height="16">
+      <Offset X="-8" Y="-8"/>
+    </ImageFromSheet>
+  </Images>
+  <ImageSets>
+    <ImageSet id="tubeswitch">
+      <ImageRef image="icon">
+        <Offset X="-8" Y="-8" />
+      </ImageRef>
+      <ImageRef image="icon">
+        <Offset X="-8" Y="8" />
+      </ImageRef>
+      <ImageRef image="icon">
+        <Offset X="8" Y="-8" />
+      </ImageRef>
+      <ImageRef image="icon">
+        <Offset X="8" Y="8" />
+      </ImageRef>
+    </ImageSet>
+  </ImageSets>
+  <Properties>
+    <Property name="Trigger" description="Which effect this Tube Switch should apply." type="triggers" startbit="0" length="8" />
+  </Properties>
+  <Enums>
+    <Enum name="triggers">
+      <EnumMember name="Tunnel On Right" />
+      <EnumMember name="Tunnel On Left" />
+      <EnumMember name="Wall Unstick" />
+      <EnumMember name="Conveyor - Downwards" />
+      <EnumMember name="Conveyor - Upwards" />
+    </Enum>
+  </Enums>
+  <DefaultImage>
+    <ImageSetRef set="tubeswitch" />
+  </DefaultImage>
+  <Subtypes>
+    <Subtype id="00" name="Tunnel On Right">
+      <ImageSetRef set="tubeswitch" />
+    </Subtype>
+    <Subtype id="01" name="Tunnel On Left">
+      <ImageSetRef set="tubeswitch" />
+    </Subtype>
+    <Subtype id="02" name="Wall Unstick">
+      <ImageSetRef set="tubeswitch" />
+    </Subtype>
+    <Subtype id="03" name="Conveyor - Downwards">
+      <ImageSetRef set="tubeswitch" />
+    </Subtype>
+    <Subtype id="04" name="Conveyor - Upwards">
+      <ImageSetRef set="tubeswitch" />
+    </Subtype>
+  </Subtypes>
+</ObjDef>

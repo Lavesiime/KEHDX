@@ -1,0 +1,53 @@
+;; KEHDX Credits file
+;; For now, it's just a loose copy of the original KEH's but it should prolly be updated a little
+;; Valid stuff to go in brakets:
+;; - number indicates palette bank text should use (0 for green header, 2 for blue)
+;; - exlcamation mark means that an invisible end marker should be added there, once it goes off screen the credits end will start
+;; - plus sign followed by (single digit) number to pad out names extra by given px
+;; - minus sign followed by (single digit) number to go back given number of px
+   ; credits start here
+
+
+[0]Header
+[0]Header
+[0]Header
+[0]Header
+[0]Header
+[0]Header
+[2]Text
+
+[0]Header 2
+[2]text
+[2]textt
+[2]texttt
+[2]textttt
+[2]texttttt
+[2]textttttt
+[2]texttttttt
+
+[0]Created By:
+[2]MainMemory
+[2]KarlEmerald
+[2]Lave sIime
+
+[0]Senior Assistant:
+[2]Programmer:
+[2]Flamewing
+
+[0]Level Design:
+[2]MarkeyJester
+
+[0]Coding Assistance:
+[2]Clownacy
+[2]FraGag
+[2]MarkeyJester
+[2]Valley Bell
+[2]Jorge Nuno
+
+[0]Graphics:
+[2]MarkeyJester
+[2]E-122-Psi
+[2]VAdaPEGA
+
+
+[!] ; credits end marker

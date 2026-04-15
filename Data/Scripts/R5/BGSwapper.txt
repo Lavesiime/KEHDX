@@ -1,0 +1,118 @@
+// ----------------------------------
+// RSDK Project: Sonic CD
+// Script Description: BG Swapper Object
+// Script Author: Christian Whitehead/Simon Thomley
+// Unpacked by Rubberduckycooly's script unpacker
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+private alias object.value0 : object.layerL
+private alias object.value1 : object.layerR
+private alias object.value2 : object.layerLH
+private alias object.value3 : object.layerRH
+
+// Layer Aliases, correspond to BG layers in the scene file
+private alias 1 : LAYER_INSIDE // (includes rocks)
+private alias 2 : LAYER_OUTSIDE
+
+// Player Aliases
+private alias object.xpos : player.xpos
+
+// Reserved object slots
+private alias 10 : SLOT_ZONESETUP
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectDraw
+	return
+	currentPlayer = screen.currentID
+	if player[currentPlayer].xpos > object.xpos
+		stage.activeLayer[0] = object.layerR
+//		stage.activeLayer[3] = object.layerRH
+	else
+		stage.activeLayer[0] = object.layerL
+//		stage.activeLayer[3] = object.layerLH
+	end if
+	
+	if object.propertyValue == 0
+		// Inside to the left of the BG Swapper object, outside to the right
+
+		if Player.XPos > Object.XPos
+			Stage.ActiveLayer[0] = object.layerR
+		else
+			Stage.ActiveLayer[0] = object.layerL
+		end if
+	else
+		// Outside to the left of the BG Swapper object, inside to the right
+
+		if Player.XPos > Object.XPos
+			Stage.ActiveLayer[0] = LAYER_INSIDE
+		else
+			Stage.ActiveLayer[0] = LAYER_OUTSIDE
+		end if
+	end if
+end event
+
+
+sub ObjectStartup
+	foreach (TypeName[BG Swapper], arraypos0, ALL_ENTITIES)
+		object[arraypos0].layerRH = object[arraypos0].propertyValue
+		object[arraypos0].layerRH &= 3
+		temp0 = object[arraypos0].propertyValue
+		temp0 >>= 2
+		object[arraypos0].layerRH = temp0
+		object[arraypos0].layerRH &= 3
+	next
+	
+	// In this setup, we're gonna find what the initial BG should be when starting the level
+	// This is based on seeing what BG Swapper checkpoints the player spawns between
+
+	// TempValue0 is iXPos of first BG Swapper
+	//    (Default of 64 chunks in)
+	// TempValue1 is iXPos of last BG Swapper
+	//    (Default of level's start itself)
+	TempValue0 = 0x4000
+	TempValue1 = 0
+
+	// (We can use iXPos because the last few bytes of the BG Swapper's position aren't important)
+
+	// Cycle throuh all BG Swapper Objects in the level
+	ArrayPos0 = 32
+	while ArrayPos0 < 1056
+		if Object[ArrayPos0].Type == TypeName[BG Swapper]
+			if Object[ArrayPos0].iXPos < TempValue0
+				TempValue0 = Object[ArrayPos0].iXPos
+			end if
+
+			if Object[ArrayPos0].iXPos > TempValue1
+				TempValue1 = Object[ArrayPos0].iXPos
+			end if
+		end if
+
+		ArrayPos0++
+	loop
+
+	// Get the Player's truncated XPos
+	// In this case, we can't use iXPos because Player position is too important to shave the last few bits off of
+	TempValue2   = Player.XPos
+	TempValue2 >>= 16
+
+	// See which BG Swappers the player is inbetween and set the Background accordingly
+	if TempValue2 > TempValue0
+		if TempValue2 > TempValue1
+			Stage.ActiveLayer[0] = LAYER_INSIDE
+		else
+			Stage.ActiveLayer[0] = LAYER_OUTSIDE
+		end if
+	else
+		Stage.ActiveLayer[0] = LAYER_INSIDE
+	end if
+end sub
+
+

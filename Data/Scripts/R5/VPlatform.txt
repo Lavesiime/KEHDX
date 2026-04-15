@@ -1,0 +1,227 @@
+// ----------------------------------
+// RSDK Project: Sonic CD
+// Script Description: V Platform Object
+// Script Author: Christian Whitehead/Simon Thomley
+// Unpacked by Rubberduckycooly's script unpacker
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+// prop val info:
+// bit 0:   start from
+// bit 1-2: modifier
+// bit 3-4: size
+// bit 7:   xbounds
+
+private alias object.value0 : object.platformY
+private alias object.value1 : object.collisionOffset.y
+private alias object.value2 : object.angleFull
+private alias object.value3 : object.hitbox.left
+private alias object.value4 : object.hitbox.right
+private alias object.value5 : object.altFrame
+
+private alias 0 : VPLATFORM_NORMAL
+private alias 1 : VPLATFORM_CONVEYOR
+private alias 2 : VPLATFORM_SPRING
+
+// Player Aliases
+private alias object.ypos : player.ypos
+
+private alias object.value17 : debugMode.currentSelection
+
+
+// ========================
+// Function Declarations
+// ========================
+
+reserve function VPlatform_DebugDraw
+reserve function VPlatform_DebugSpawn
+
+
+// ========================
+// Static Values
+// ========================
+
+private value VPlatform_startDebugID
+
+
+// ========================
+// Function Definitions
+// ========================
+
+private function VPlatform_DebugDraw
+	temp0 = debugMode[0].currentSelection
+	temp0 -= VPlatform_startDebugID
+	temp0--
+	temp0 <<= 1
+	DrawSprite(temp0)
+end function
+
+
+private function VPlatform_DebugSpawn
+	CreateTempObject(TypeName[V Platform], 0, object.xpos, object.ypos)
+	object[tempObjectPos].direction = object.direction
+	
+	object[tempObjectPos].frame = debugMode[0].currentSelection
+	object[tempObjectPos].frame -= VPlatform_startDebugID
+	object[tempObjectPos].frame--
+	object[tempObjectPos].frame <<= 1
+end function
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+object[0].value0++
+	temp7 = object.ypos
+	
+	object.angle++
+	if object.angle == 312
+		object.angle = 0
+	end if
+	
+	object.angleFull = object.angle
+	object.angleFull <<= 6
+	object.angleFull /= 39
+	
+	Sin(object.collisionOffset.y, object.angleFull)
+	
+	if object.direction == 0
+		// Downwards Platform
+		object.collisionOffset.y *= 0x1800
+		object.collisionOffset.y += 0x300000
+	else
+		// Upwards Platform
+		object.collisionOffset.y *= -0x1800
+		object.collisionOffset.y -= 0x300000
+	end if
+	
+	object.collisionOffset.y += object.ypos
+	object.collisionOffset.y &= 0xFFFF0000
+	object.collisionOffset.y -= object.platformY
+	
+	object.ypos = object.platformY
+	
+	switch object.propertyValue
+	case VPLATFORM_NORMAL
+	case VPLATFORM_CONVEYOR
+		foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+			BoxCollisionTest(C_PLATFORM, object.entityPos, object.hitbox.left, -16, object.hitbox.right, 0, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+			if checkResult == true
+				player[currentPlayer].ypos += object.collisionOffset.y
+				
+				//if object.propertyValue == VPLATFORM_CONVEYOR
+				//	if ConveyorBelt_Flag == 0
+				//		player[currentPlayer].xpos += ConveyorBelt_Speed
+				//	else
+				//		player[currentPlayer].xpos -= ConveyorBelt_Speed
+				//	end if
+				//end if
+			end if
+		next
+		break
+	end switch
+	
+	object.ypos = temp7
+end event
+
+
+event ObjectDraw
+	if object.direction == 0
+		// Downards Platform
+		Sin(object.platformY, object.angleFull)
+		object.platformY *= 0x1800
+		object.platformY += 0x300000
+	else
+		// Upwards Platform
+		Sin(object.platformY, object.angleFull)
+		object.platformY *= -0x1800
+		object.platformY -= 0x300000
+	end if
+	
+	object.platformY += Object.YPos
+	object.platformY &= 0xFFFF0000 // Truncate the value
+	DrawSpriteXY(object.frame, object.xpos, object.platformY)
+	
+	if object.propertyValue == VPLATFORM_CONVEYOR
+		DrawSpriteXY(object.altFrame, object.xpos, object.platformY)
+	end if
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("R5/Objects.gif")
+	
+	// Format followed:
+	// Main platform sprite, followed by conveyor overlay sprite
+	
+	// 0 - Small
+	SpriteFrame(-16, -16, 32, 32, 1, 51)
+	SpriteFrame(-16, -16, 32, 16, 65, 208)
+	
+	// 2 - Medium
+	SpriteFrame(-32, -16, 64, 32, 34, 51)
+	SpriteFrame(-32, -16, 64, 16, 1, 208)
+	
+	// 3 - Large
+	SpriteFrame(-48, -16, 96, 32, 1, 84)
+	SpriteFrame(-48, -16, 96, 16, 1, 191)
+	
+	foreach (TypeName[V Platform], arrayPos0, ALL_ENTITIES)
+		// Get starting direction
+		GetBit(object[arrayPos0].direction, object[arrayPos0].propertyValue, 0)
+		
+		// If top bit's set, then give this platform special priority
+		if object[arrayPos0].propertyValue > 0x7F
+			object[arrayPos0].priority = PRIORITY_XBOUNDS
+		end if
+		
+		// Get platform size
+		object[arrayPos0].frame = object[arrayPos0].propertyValue
+		object[arrayPos0].frame >>= 3
+		object[arrayPos0].frame &= 3
+		switch object[arrayPos0].frame
+		case 0
+		default
+			// Small platform
+			object[arrayPos0].hitbox.right = 16
+			break
+			
+		case 1
+			// Medium platform
+			object[arrayPos0].hitbox.right = 32
+			break
+			
+		case 2
+			// Large platform
+			object[arrayPos0].hitbox.right = 48
+			break
+			
+		end switch
+		
+		object[arrayPos0].frame <<= 1
+		object[arrayPos0].altFrame = object[arrayPos0].frame
+		object[arrayPos0].altFrame++
+		
+		object[arrayPos0].hitbox.left = object[arrayPos0].hitbox.right
+		FlipSign(object[arrayPos0].hitbox.left)
+		
+		object[arrayPos0].propertyValue >>= 1
+		object[arrayPos0].propertyValue &= 3
+	next
+	
+	temp0 = 0
+	VPlatform_startDebugID = DebugMode_ObjCount
+	VPlatform_startDebugID--
+	while temp0 < 3
+		SetTableValue(TypeName[V Platform], DebugMode_ObjCount, DebugMode_TypesTable)
+		SetTableValue(VPlatform_DebugDraw, DebugMode_ObjCount, DebugMode_DrawTable)
+		SetTableValue(VPlatform_DebugSpawn, DebugMode_ObjCount, DebugMode_SpawnTable)
+		DebugMode_ObjCount++
+		temp0++
+	loop
+end event

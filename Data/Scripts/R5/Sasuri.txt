@@ -1,0 +1,448 @@
+// ----------------------------------
+// RSDK Project: Sonic CD
+// Script Description: BG Swapper Object
+// Script Author: Christian Whitehead/Simon Thomley
+// Unpacked by Rubberduckycooly's script unpacker
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+private alias object.value0 : object.timer
+private alias object.value1 : object.cannon
+private alias object.value2 : object.crawlTimeL
+private alias object.value3 : object.crawlTimeR
+
+// States
+private alias 0 : SASURI_CRAWLLEFT
+private alias 1 : SASURI_CRAWLRIGHT
+private alias 2 : SASURI_SPOTPLAYER
+private alias 3 : SASURI_SHOOT
+private alias 4 : SASURI_RETRACTCANNON
+private alias 5 : SASURI_BULLET
+
+// Player Aliases
+private alias object.value40 : player.hitboxLeft
+private alias object.value38 : player.hitboxTop
+private alias object.value41 : player.hitboxRight
+private alias object.value39 : player.hitboxBottom
+
+private alias object.value17 : debugMode.currentSelection
+
+// Path ID Aliases
+private alias 0 : PATH_A
+
+
+// ========================
+// Function Declarations
+// ========================
+
+reserve function Sasuri_DebugDraw
+reserve function Sasuri_DebugSpawn
+
+
+// ========================
+// Static Values
+// ========================
+
+private value Sasuri_startDebugID
+
+
+// ========================
+// Function Definitions
+// ========================
+
+private function Sasuri_DebugDraw
+	temp0 = debugMode[0].currentSelection
+	temp0 -= Sasuri_startDebugID
+	DrawSprite(temp0)
+end function
+
+
+private function Sasuri_DebugSpawn
+	temp0 = debugMode[0].currentSelection
+	temp0 -= Sasuri_startDebugID
+	CreateTempObject(TypeName[Sasuri], temp0, object.xpos, object.ypos)
+	//object[tempObjectPos].startPos.y = object[tempObjectPos].ypos
+end function
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	object.frame++
+	object.frame %= 60
+	
+	switch object.state
+	case SASURI_CRAWLLEFT
+		object.xpos -= object.xvel
+		
+		object.timer--
+		if object.timer <= object.crawlTimeL
+			object.state = SASURI_CRAWLRIGHT
+			object.direction = FLIP_X
+		end if
+		
+		ObjectTileGrip(CSIDE_FLOOR, 0, 13, PATH_A)
+		if checkResult == false
+			object.state = SASURI_CRAWLRIGHT
+			object.timer = 0
+			object.direction = FLIP_X
+		end if
+		break
+		
+	case SASURI_CRAWLRIGHT
+		object.xpos += object.xvel
+		
+		object.timer++
+		if object.timer >= object.crawlTimeR
+			object.State = SASURI_CRAWLLEFT
+			object.direction = FLIP_NONE
+		end if
+		
+		// Also like above, see if the Sasuri's still on ground and if it isn't, then turn around
+		ObjectTileGrip(CSIDE_FLOOR, 0, 13, PATH_A)
+		if checkResult == false
+			object.state = SASURI_CRAWLLEFT
+			object.timer = 0
+			object.direction = FLIP_NONE
+		end if
+		break
+		
+	case SASURI_SPOTPLAYER
+		// This state's set in ObjectPlayerInteraction if the Player is within shooting range
+		
+		if object.cannon < 30
+			object.cannon++
+		else
+			object.state = SASURI_SHOOT
+			object.cannon = 0
+		end if
+		break
+		
+	case SASURI_SHOOT
+		if object.cannon < 40
+			if object.cannon == 10
+				PlaySfx(SfxName[Shot], false)
+				CreateTempObject(TypeName[Sasuri], 0, object.xpos, object.ypos)
+				object[tempObjectPos].state = SASURI_BULLET
+				object[TempObjectPos].yPos -= 0x180000
+				
+				if object.direction == FLIP_NONE
+					object[tempObjectPos].xpos -= 0x70000
+					object[tempObjectPos].xvel = -0x30000
+				else
+					object[tempObjectPos].xpos += 0x70000
+					object[tempObjectPos].xvel = 0x30000
+				end if
+				
+				object.drawOrder = 4
+			end if
+			
+			object.cannon++
+		else
+			object.state = SASURI_RETRACTCANNON
+			object.cannon = 0
+			
+			object.drawOrder = 3
+		end if
+		break
+		
+	case SASURI_RETRACTCANNON
+		if object.cannon < 30
+			object.cannon++
+		else
+			if Object.Direction == FLIP_NONE
+				Object.State = SASURI_CRAWLLEFT
+			else
+				Object.State = SASURI_CRAWLRIGHT
+			end if
+		end if
+		break
+		
+	case SASURI_BULLET
+		object.xpos += object.xvel
+		
+		object.timer++
+		object.timer &= 3
+		
+		foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+			BoxCollisionTest(C_TOUCH, object.entityPos, -6, -6, 6, 6, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+			if checkResult == true
+				CallFunction(Player_ProjectileHit)
+			end if
+		next
+		
+		if object.outOfBounds == true
+			object.type = TypeName[Blank Object]
+		end if
+		break
+		
+	end switch
+	
+	return
+	
+	if object.state != SASURI_BULLET
+		foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+			BoxCollisionTest(C_TOUCH, object.entityPos, -22, -14, 22, 14, currentPlayer, player[currentPlayer].hitboxLeft, player[currentPlayer].hitboxTop, player[currentPlayer].hitboxRight, player[currentPlayer].hitboxBottom)
+			if checkResult == true
+				CallFunction(Player_BadnikBreak)
+				
+				if object.type == TypeName[Blank Object]
+					CallFunction(EmeraldManager_AwardEmerald)
+				else
+					if object.state < SASURI_SHOOT
+					switch object.state
+					case SASURI_CRAWLLEFT
+					case SASURI_CRAWLRIGHT
+						// If in a movement state, then see if the Sasuri
+						if object.cannon == 0
+							BoxCollisionTest(C_TOUCH, object.entityPos, -22, -14, 22, 14, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+							if checkResult == true
+								Object.State = SASURI_SPOTPLAYER
+								
+								if Player.XPos < Object.XPos
+									Object.Direction = FLIP_NONE
+								else
+									Object.Direction = FLIP_X
+								end if
+							end if
+						else
+							object.cannon = 0
+						end if
+						break
+						
+					end if
+				end if
+			end if
+		next
+	end if
+end event
+
+
+sub ObjectPlayerInteraction
+#platform: Use_Standalone
+	PlayerObjectCollision(C_TOUCH, -22, -14, 22, 14)
+#endplatform
+#platform: Use_Origins
+	PlayerObjectCollision(C_ENEMY, -22, -14, 22, 14)
+#endplatform
+	if CheckResult == true
+		CallFunction(Player_BadnikBreak)
+	end if
+	
+	switch Object.State
+	case SASURI_CRAWLLEFT
+	case SASURI_CRAWLRIGHT
+		// If in a movement state, then see if the Sasuri
+		if object.cannon == 0
+			PlayerObjectCollision(C_TOUCH, -64, -24, 64, 24)
+			if CheckResult == true
+				Object.State = SASURI_SPOTPLAYER
+				
+				if Player.XPos < Object.XPos
+					Object.Direction = FLIP_NONE
+				else
+					Object.Direction = FLIP_X
+				end if
+			end if
+		else
+			object.cannon = 0
+		end if
+		break
+		
+	end switch
+	
+end sub
+
+
+event ObjectDraw
+	if object.state == SASURI_BULLET
+		GetBit(object.frame, object.timer, 1)
+		object.frame += 14
+		DrawSprite(object.frame)
+		return
+	end if
+	
+	if object.propertyValue == 0
+		if object.frame < 30
+			DrawSpriteFX(2, FX_FLIP, Object.XPos, Object.YPos)
+			DrawSpriteFX(0, FX_FLIP, Object.XPos, Object.YPos)
+			DrawSpriteFX(3, FX_FLIP, Object.XPos, Object.YPos)
+		else
+			DrawSpriteFX(4, FX_FLIP, Object.XPos, Object.YPos)
+			DrawSpriteFX(0, FX_FLIP, Object.XPos, Object.YPos)
+			DrawSpriteFX(5, FX_FLIP, Object.XPos, Object.YPos)
+		end if
+		
+		switch object.state
+		case SASURI_CRAWLLEFT
+		case SASURI_CRAWLRIGHT
+		case SASURI_SPOTPLAYER
+		case SASURI_RETRACTCANNON
+			// Draw the pulled back cannon frame
+			DrawSpriteFX(10, FX_FLIP, Object.XPos, Object.YPos)
+			break
+			
+		case SASURI_SHOOT
+			// The Sasuri's shooting, so draw the extended cannon frame
+			DrawSpriteFX(11, FX_FLIP, Object.XPos, Object.YPos)
+			break
+		
+		end switch
+	else
+		if object.frame < 30
+			DrawSpriteFX(6, FX_FLIP, Object.XPos, Object.YPos)
+			DrawSpriteFX(1, FX_FLIP, Object.XPos, Object.YPos)
+			DrawSpriteFX(7, FX_FLIP, Object.XPos, Object.YPos)
+		else
+			DrawSpriteFX(8, FX_FLIP, Object.XPos, Object.YPos)
+			DrawSpriteFX(1, FX_FLIP, Object.XPos, Object.YPos)
+			DrawSpriteFX(9, FX_FLIP, Object.XPos, Object.YPos)
+		end if
+		
+		switch object.state
+		case SASURI_CRAWLLEFT
+		case SASURI_CRAWLRIGHT
+		case SASURI_SPOTPLAYER
+		case SASURI_RETRACTCANNON
+			DrawSpriteFX(12, FX_FLIP, Object.XPos, Object.YPos)
+			break
+			
+		case SASURI_SHOOT
+			DrawSpriteFX(13, FX_FLIP, Object.XPos, Object.YPos)
+			break
+			
+		end switch
+	end if
+
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("R5/Objects.gif")
+	
+	// Sasuri Frames
+	
+	// Good Main Sasuri Frame
+	SpriteFrame(-24, -16, 48, 32, 174, 141)
+	
+	// Bad Main Sasuri Frame
+	SpriteFrame(-24, -16, 48, 32, 174, 174)
+	
+	// Good Sasuri Paw Frames
+	SpriteFrame(-32, -4, 32, 16, 100, 110)
+	SpriteFrame(-21, -3, 32, 16, 100, 110)
+	SpriteFrame(-28, -4, 32, 16, 100, 110)
+	SpriteFrame(-25, -3, 32, 16, 100, 110)
+	
+	// Bad Sasuri Paw Frames
+	SpriteFrame(-32, -4, 32, 16, 100, 127)
+	SpriteFrame(-21, -3, 32, 16, 100, 127)
+	SpriteFrame(-28, -4, 32, 16, 100, 127)
+	SpriteFrame(-25, -3, 32, 16, 100, 127)
+	
+	// Good Sasuri Cannon Frames
+	SpriteFrame(-9, -24, 24, 16, 100, 93)
+	SpriteFrame(-5, -29, 24, 16, 100, 93)
+	
+	// Bad Sasuri Cannon Frames
+	SpriteFrame(-1, -24, 16, 16, 133, 110)
+	SpriteFrame(3, -29, 16, 16, 133, 110)
+	
+	// Bullet Frames
+	SpriteFrame(-8, -8, 16, 16, 67, 27)
+	SpriteFrame(-8, -8, 16, 16, 133, 127)
+	
+	foreach (TypeName[Sasuri], arraypos0, ALL_ENTITIES)
+		if object[arraypos0].propertyValue == 0
+			object[arraypos0].xvel = 0x10000
+			object[arraypos0].crawlTimeL = -80
+		else
+			object[arraypos0].xvel = 0x8000
+			object[arraypos0].crawlTimeL = -160
+		end if
+		
+		object[arraypos0].crawlTimeR = object[arraypos0].crawlTimeL
+		FlipSign(object[arraypos0].crawlTimeR)
+		
+		object[arraypos0].state = SASURI_CRAWLLEFT
+	next
+	
+	temp0 = 0
+	Sasuri_startDebugID = DebugMode_ObjCount
+	while temp0 < 2
+		SetTableValue(TypeName[Sasuri], DebugMode_ObjCount, DebugMode_TypesTable)
+		SetTableValue(Sasuri_DebugDraw, DebugMode_ObjCount, DebugMode_DrawTable)
+		SetTableValue(Sasuri_DebugSpawn, DebugMode_ObjCount, DebugMode_SpawnTable)
+		DebugMode_ObjCount++
+		temp0++
+	loop
+end event
+
+
+// ========================
+// Editor Subs
+// ========================
+
+sub RSDKEdit
+	if Editor.ReturnVariable == true
+		switch Editor.VariableID
+		case EDIT_VAR_PROPVAL // Property Value
+			CheckResult = Object.PropertyValue
+			break
+		case 0 // Condition
+			CheckResult = Object.PropertyValue
+			break
+		end switch
+	else
+		switch Editor.VariableID
+		case EDIT_VAR_PROPVAL // Property Value
+			Object.PropertyValue = Editor.VariableValue
+			break
+		case 0 // Condition
+			Object.PropertyValue = Editor.VariableValue
+			break
+		end switch
+	end if
+end sub
+
+
+sub RSDKDraw
+	if Object.PropertyValue == GOOD_QUALITY
+		DrawSpriteFX(2, FX_FLIP, Object.XPos, Object.YPos)
+		DrawSpriteFX(0, FX_FLIP, Object.XPos, Object.YPos)
+		DrawSpriteFX(3, FX_FLIP, Object.XPos, Object.YPos)
+		DrawSpriteFX(6, FX_FLIP, Object.XPos, Object.YPos)
+	else
+		DrawSpriteFX(4, FX_FLIP, Object.XPos, Object.YPos)
+		DrawSpriteFX(1, FX_FLIP, Object.XPos, Object.YPos)
+		DrawSpriteFX(5, FX_FLIP, Object.XPos, Object.YPos)
+		DrawSpriteFX(7, FX_FLIP, Object.XPos, Object.YPos)
+	end if
+end sub
+
+
+sub RSDKLoad
+	LoadSpriteSheet("R5/Objects.gif")
+	
+	SpriteFrame(-24, -16, 48, 32, 174, 141)
+	SpriteFrame(-24, -16, 48, 32, 174, 174)
+	
+	SpriteFrame(-32, -4, 32, 16, 100, 110)
+	SpriteFrame(-21, -3, 32, 16, 100, 110)
+	
+	SpriteFrame(-32, -4, 32, 16, 100, 127)
+	SpriteFrame(-21, -3, 32, 16, 100, 127)
+	
+	SpriteFrame(-9, -24, 24, 16, 100, 93)
+	SpriteFrame(-1, -24, 16, 16, 133, 110)
+
+	AddEditorVariable("Condition")
+	SetActiveVariable("Condition")
+	AddEnumVariable("Good", GOOD_QUALITY)
+	AddEnumVariable("Bad",  BAD_QUALITY)
+end sub

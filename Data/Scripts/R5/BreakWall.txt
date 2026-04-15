@@ -1,0 +1,205 @@
+// ----------------------------------
+// RSDK Project: Sonic CD
+// Script Description: Breakable Wall Object
+// Script Author: Christian Whitehead/Simon Thomley
+// Unpacked by Rubberduckycooly's script unpacker
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+private alias 0 : BREAKWALL_IDLE
+private alias 1 : BREAKWALL_DESTROYED
+
+// Player Aliases
+private alias object.propertyValue : player.character
+private alias object.animation : player.animation
+
+
+// ========================
+// Events
+// ========================
+
+
+event ObjectMain
+	if object.propertyValue > 0
+		object.xpos += object.xvel
+		object.ypos += object.yvel
+		object.yvel += 0x4000
+		
+		if object.outOfBounds == true
+			object.type = TypeName[Blank Object]
+		end if
+	else
+		if object.state == BREAKWALL_IDLE
+			temp1 = false
+			
+			foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+				CheckEqual(player[currentPlayer].character, PLAYER_KNUCKLES_A)
+				temp0 = checkResult
+				CheckEqual(player[currentPlayer].animation, ANI_JUMPING)
+				temp0 |= checkResult
+				BoxCollisionTest(C_SOLID, object.entityPos, -18, -48, 18, 48, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+			next
+		else
+			if object.outOfBounds == true
+				object.state = BREAKWALL_IDLE
+			end if
+		end if
+	end if
+end event
+
+
+sub ObjectPlayerInteraction
+
+	if Object.PropertyValue < 1
+		if Object.Destroyed == false
+			CheckResult = false
+			if Player.Animation == ANI_JUMPING
+				CheckResult = true
+			end if
+			if CheckResult == true
+				PlayerObjectCollision(C_TOUCH, -18, -48, 18, 48)
+				if CheckResult == true
+					Object.Destroyed = true
+					Object.Priority = PRIORITY_ACTIVE
+					PlaySfx(SfxName[Explosion], false)
+					
+					// Spawn all the Wall Fragments
+					// - TempValue1 is left position  (8 pixels left  from this object's position)
+					// - TempValue2 is right position (8 pixels right from this object's position)
+					// - TempValue3 is Y Position, starting 24 pixels from this object's position
+					
+					TempValue1 = Object.XPos
+					TempValue1 -= 0x80000
+					
+					TempValue2 = Object.XPos
+					TempValue2 += 0x80000
+					
+					TempValue3 = Object.YPos
+					TempValue3 -= 0x180000
+					
+					CreateTempObject(TypeName[Breakable Wall], BREAKWALL_DEBRIS_1, TempValue1, TempValue3)
+					Object[TempObjectPos].XVelocity = -0x10000
+					Object[TempObjectPos].YVelocity = -0x20000
+					Object[TempObjectPos].DrawOrder = 5
+
+					CreateTempObject(TypeName[Breakable Wall], BREAKWALL_DEBRIS_2, TempValue2, TempValue3)
+					Object[TempObjectPos].XVelocity = 0x10000
+					Object[TempObjectPos].YVelocity = -0x20000
+					Object[TempObjectPos].DrawOrder = 5
+					
+					TempValue3 += 0x100000
+					
+					CreateTempObject(TypeName[Breakable Wall], BREAKWALL_DEBRIS_3, TempValue1, TempValue3)
+					Object[TempObjectPos].XVelocity = -0x20000
+					Object[TempObjectPos].YVelocity = -0x10000
+					Object[TempObjectPos].DrawOrder = 5
+
+					CreateTempObject(TypeName[Breakable Wall], BREAKWALL_DEBRIS_4, TempValue2, TempValue3)
+					Object[TempObjectPos].XVelocity = 0x20000
+					Object[TempObjectPos].YVelocity = -0x10000
+					Object[TempObjectPos].DrawOrder = 5
+					
+					TempValue3 += 0x100000
+					
+					CreateTempObject(TypeName[Breakable Wall], BREAKWALL_DEBRIS_5, TempValue1, TempValue3)
+					Object[TempObjectPos].XVelocity = -0x40000
+					Object[TempObjectPos].YVelocity = 0
+					Object[TempObjectPos].DrawOrder = 5
+
+					CreateTempObject(TypeName[Breakable Wall], BREAKWALL_DEBRIS_6, TempValue2, TempValue3)
+					Object[TempObjectPos].XVelocity = 0x40000
+					Object[TempObjectPos].YVelocity = 0
+					Object[TempObjectPos].DrawOrder = 5
+					
+					TempValue3 += 0x100000
+					
+					CreateTempObject(TypeName[Breakable Wall], BREAKWALL_DEBRIS_7, TempValue1, TempValue3)
+					Object[TempObjectPos].XVelocity = -0x20000
+					Object[TempObjectPos].YVelocity = 0x10000
+					Object[TempObjectPos].DrawOrder = 5
+
+					CreateTempObject(TypeName[Breakable Wall], BREAKWALL_DEBRIS_8, TempValue2, TempValue3)
+					Object[TempObjectPos].XVelocity = 0x20000
+					Object[TempObjectPos].YVelocity = 0x10000
+					Object[TempObjectPos].DrawOrder = 5
+				end if
+			else
+				PlayerObjectCollision(C_BOX, -16, -48, 16, 48)
+				PlayerObjectCollision(C_TOUCH, -16, -48, 16, 48)
+				if CheckResult == true
+					if Player.XPos < Object.XPos
+						Player.XPos = Player.CollisionLeft
+						Player.XPos <<= 16
+						Player.XPos += Object.XPos
+						Player.XPos -= 0x100000
+					else
+						Player.XPos = Player.CollisionRight
+						Player.XPos <<= 16
+						Player.XPos += Object.XPos
+						Player.XPos += 0x100000
+					end if
+				end if
+			end if
+		end if
+	end if
+	
+end sub
+
+
+sub ObjectDraw
+	
+	if Object.Destroyed == false
+		DrawSprite(Object.PropertyValue)
+	end if
+	
+end sub
+
+
+sub ObjectStartup
+	LoadSpriteSheet("R5/Objects.gif")
+	SpriteFrame(-16, -48, 32, 96, 223, 141)
+	SpriteFrame(-8, -8, 16, 16, 223, 157)
+	SpriteFrame(-8, -8, 16, 16, 239, 157)
+	SpriteFrame(-8, -8, 16, 16, 223, 173)
+	SpriteFrame(-8, -8, 16, 16, 239, 173)
+	SpriteFrame(-8, -8, 16, 16, 223, 189)
+	SpriteFrame(-8, -8, 16, 16, 239, 189)
+	SpriteFrame(-8, -8, 16, 16, 223, 205)
+	SpriteFrame(-8, -8, 16, 16, 239, 205)
+end sub
+
+
+// ========================
+// Editor Subs
+// ========================
+
+sub RSDKDraw
+	DrawSprite(0)
+
+	if Editor.ShowGizmos == true
+		TempValue0 = Object.iXPos
+		TempValue0 -= 16
+		TempValue1 = Object.iYPos
+		TempValue1 -= 48
+
+		DrawRectOutline(TempValue0, TempValue1, 32, 96, 255, 255, 255, 255)
+	end if
+	
+	// TODO: perhaps it would be cool to show the deactivation hitbox, but at the same time, is it even that important anways?
+end sub
+
+
+sub RSDKLoad
+	LoadSpriteSheet("R5/Objects.gif")
+
+	// TODO: support other time periods
+	// Surely there's a better way to do it than a load of unique and boring checkCurrentStageFolder checks?
+	SpriteFrame(-16, -48, 32, 96, 223, 141)
+
+
+	// Although used by the object, it shouldn't be set from the editor
+	SetVariableAlias(ALIAS_VAR_PROPVAL, "unused")
+end sub

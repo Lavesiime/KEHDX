@@ -1,0 +1,208 @@
+// ----------------------------------
+// RSDK Project: Sonic CD
+// Script Description: QQZ Setup Object
+// Script Author: Christian Whitehead/Simon Thomley
+// Unpacked by Rubberduckycooly's script unpacker
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+private alias object.value1 : object.glowTimer
+private alias object.value2 : object.glowFrame
+
+private alias object.value3 : object.convTimer
+private alias object.value4 : object.convFrame
+
+// object.speed: conveyor belt speed
+// object.direction: conveyor belt direction
+// object.frame conveyor belt frame
+
+// Layer Aliases
+private alias 1 : LAYER_INSIDE
+
+// Tile Info ID Aliases
+private alias 5 : TILEINFO_FLAGSA
+
+// Tile Flag Aliases
+private alias 1 : TILE_CONVEYORBELT
+
+// Conveyor Belt Directions
+private alias 0 : CONVEYOR_RIGHT
+private alias 3 : CONVEYOR_LEFT
+
+// Tracks
+private alias 0 : TRACK_STAGE
+private alias 1 : TRACK_ACTFINISH
+private alias 2 : TRACK_INVINCIBLE
+private alias 3 : TRACK_CONTINUE
+private alias 4 : TRACK_BOSS
+private alias 5 : TRACK_GAMEOVER
+private alias 6 : TRACK_DROWNING
+private alias 7 : TRACK_SUPER
+
+// Reserved object slots
+private alias 10 : SLOT_ZONESETUP
+private alias 25 : SLOT_MUSICEVENT_CHANGE
+
+// Music Events
+private alias 2 : MUSICEVENT_TRANSITION
+
+private alias 0 : MUSICEVENT_FLAG_NOCHANGE
+private alias 1 : MUSICEVENT_FLAG_SPEEDUP
+private alias 2 : MUSICEVENT_FLAG_SLOWDOWN
+
+// Player Aliases
+private alias object.xpos : player.xpos
+private alias object.ypos : player.ypos
+private alias object.gravity : player.gravity
+private alias object.collisionLeft : player.collisionLeft
+private alias object.collisionRight : player.collisionRight
+private alias object.collisionBottom : player.collisionBottom
+
+// Music Loops
+private alias 1     : MUSIC_LOOP_QQZ
+private alias 1     : MUSIC_LOOP_QQZ_F
+
+private alias 38679 : MUSIC_LOOP_INV
+private alias 30897 : MUSIC_LOOP_INV_F
+
+
+// ========================
+// Tables
+// ========================
+
+private table QQZSetup_rockPalette
+	0x20A0E0, 0x2060A0, 0x204080, 0x202060, 0x200040
+	0x20A0E0, 0x2060A0, 0x204080, 0x202060, 0x200040
+	0x20A0E0, 0x2060A0, 0x204080, 0x202060, 0x200040
+	0x20A0E0, 0x2060A0, 0x204080, 0x202060, 0x200040
+	0x60A0E0, 0x6060A0, 0x604080, 0x602060, 0x600040
+	0x80A0E0, 0x8060A0, 0x804080, 0x802060, 0x800040
+	0xA0A0E0, 0xA060A0, 0xA04080, 0xA02060, 0xA00040
+	0x80A0E0, 0x8060A0, 0x804080, 0x802060, 0x800040
+	0x60A0E0, 0x6060A0, 0x604080, 0x602060, 0x600040
+end table
+
+private table QQZSetup_conveyorPalette
+	0x402080, 0x8060A0, 0xC0A0E0
+	0xC0A0E0, 0x402080, 0x8060A0
+	0x8060A0, 0xC0A0E0, 0x402080
+	
+	0xE0E000, 0x400000, 0xC06000
+	0x400000, 0xC06000, 0xE0E000
+	0xC06000, 0xE0E000, 0x400000
+end table
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	if stage.activeLayer[0] == LAYER_INSIDE
+		object.glowTimer++
+		if object.glowTimer == 6
+			object.glowTimer = 0
+			
+			object.glowFrame++
+			object.glowFrame %= 9
+			
+			temp1 = object.glowFrame
+			temp1 *= 5
+			temp2 = 186
+			while temp2 < 191
+				GetTableValue(temp0, temp1, QQZSetup_rockPalette)
+				SetPaletteEntry(0, temp2, temp0)
+				
+				temp1++
+				temp2++
+			loop
+		end if
+	end if
+	
+	object.convTimer++
+	if object.convTimer == 5
+		object.convTimer = 0
+		
+		object.convFrame++
+		object.convFrame %= 3
+		
+		// (Waterfall palette cycle, uses the same timer as the conveyor belts)
+		RotatePalette(0, 200, 202, true)
+		
+		temp1 = object.convFrame
+		temp1 += object.direction
+		temp1 *= 3
+		temp2 = 170
+		while temp2 < 173
+			GetTableValue(temp0, temp1, QQZSetup_conveyorPalette)
+			SetPaletteEntry(0, temp2, temp0)
+			
+			temp1++
+			temp2++
+		loop
+	end if
+	
+	// Process Conveyor Belts
+	foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+		if player[currentPlayer].gravity == GRAVITY_GROUND
+			temp2 = player[currentPlayer].ypos
+			temp2 >>= 16
+			temp2 += player[currentPlayer].collisionBottom
+			temp2 += 2
+			
+			temp1 = player[currentPlayer].xpos
+			temp1 >>= 16
+			temp1 += player[currentPlayer].collisionLeft
+			
+			Get16x16TileInfo(temp0, temp1, temp2, TILEINFO_FLAGSA)
+			temp3 = temp0
+			
+			temp1 = player[currentPlayer].xpos
+			temp1 >>= 16
+			temp1 += player[currentPlayer].collisionRight
+			Get16x16TileInfo(temp0, temp1, temp2, TILEINFO_FLAGSA)
+			temp3 |= temp0
+			
+			if temp3 == TILE_CONVEYORBELT
+				if object.direction == CONVEYOR_RIGHT
+					player[currentPlayer].xpos += object.speed
+				else
+					player[currentPlayer].xpos -= object.speed
+				end if
+			end if
+		end if
+	next
+end event
+
+
+event ObjectDraw
+	currentPlayer = screen.currentID
+end event
+
+
+event ObjectStartup
+	object[SLOT_ZONESETUP].type = TypeName[QQZ Setup]
+	object[SLOT_ZONESETUP].priority = PRIORITY_ACTIVE
+	object[SLOT_ZONESETUP].drawOrder = 0
+	object[SLOT_ZONESETUP].speed = 0x10000
+end event
+
+
+// ========================
+// Editor Events
+// ========================
+
+event RSDKDraw
+	DrawSprite(0)
+end event
+
+
+event RSDKLoad
+	LoadSpriteSheet("Global/Display.gif")
+	SpriteFrame(-16, -16, 32, 32, 1, 143)		// #0 - "Script" Icon
+
+	SetVariableAlias(ALIAS_VAR_PROPVAL, "unused")
+end event

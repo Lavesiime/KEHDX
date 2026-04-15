@@ -1,0 +1,797 @@
+// ----------------------------------
+// RSDK Project: Knuckles' Emerald Hunt
+// Script Description: Stage Select Object
+// Script Author: Lave sIime
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+// Master aliases
+private alias object.value0 : object.timer
+private alias object.value1 : object.maxSel
+private alias object.value2 : object.pregDrag
+private alias object.value3 : object.selection
+
+// 1:1 values, not fixed point
+private alias object.value4 : object.boundsT
+private alias object.value5 : object.boundsB
+
+// speed is for normal scroll, yvel is for enforcing bounds scroll
+
+private alias 0 : STAGESEL_M_INIT
+private alias 1 : STAGESEL_M_FADEIN
+private alias 2 : STAGESEL_M_MAIN
+private alias 3 : STAGESEL_M_SCROLLDOWN
+private alias 4 : STAGESEL_M_SCROLLUP
+private alias 5 : STAGESEL_M_FADE_STAGE
+private alias 6 : STAGESEL_M_FADE_MENU
+
+// Entry aliases
+// 0-3 are reserved for attrs
+private alias object.value0 : object.listPos
+private alias object.value1 : object.activeList
+
+private alias object.value4 : object.milliseconds
+private alias object.value5 : object.seconds
+private alias object.value6 : object.minutes
+private alias object.value7 : object.score
+private alias object.value8 : object.rings
+private alias object.value9 : object.playCount
+private alias object.value10 : object.deaths
+private alias object.value11 : object.rank
+private alias object.value12 : object.master
+private alias object.value13 : object.iconFrame
+private alias object.value14 : object.nameFrame
+private alias object.value15 : object.mainSheet // also used by Master
+private alias object.value16 : object.iconSheet
+private alias object.value20 : object.drawPos.x
+private alias object.value21 : object.drawPos.y
+private alias object.value22 : object.drawWidth
+private alias object.value23 : object.drawHeight
+private alias object.value24 : object.drawColour.r
+private alias object.value25 : object.drawColour.g
+private alias object.value26 : object.drawColour.b
+
+private alias 7 : STAGESEL_B_MAIN
+
+// object.selection Aliases
+private alias 23 : SELECTION_STGSEL_COUNT // SELECTION_STGSEL_END + 1
+
+// Sprite Frame Aliases
+private alias 11 : STAGESEL_SPR_NUMBERS
+private alias 21 : STAGESEL_SPR_STGICONS
+private alias 45 : STAGESEL_SPR_STGNAMES
+
+
+// ========================
+// Function Declarations
+// ========================
+
+reserve function StageSelect_FindSelectionPos
+
+
+// ========================
+// Function Definitions
+// ========================
+
+private function StageSelect_FindSelectionPos
+	// Small function to find the Entity Pos of the Master's current selection
+	// - Returns the selection's entity pos in arrayPos0, will be -1 if entity does not exist
+
+	arrayPos0 = -1
+	
+	foreach (object.type, arrayPos7, ACTIVE_ENTITIES)
+		if object[arrayPos7].propertyValue == object.selection
+			arrayPos0 = arrayPos7
+		end if
+	next
+end function
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	switch object.state
+	case STAGESEL_M_INIT
+		CallFunction(MenuControl_CInit)
+		
+		object.timer = 320
+		SetScreenFade(0, 0, 0, object.timer)
+		object.selection = saveRAM[251]
+		object.boundsB += 64
+		object.boundsB -= screen.ysize
+		
+		options.physicalControls = true
+		
+		// Set BG speed, 0.5 px per frame rather than the 1.0 the other Menus use
+		tileLayer[1].scrollSpeed = -0x8000
+		hParallax[0].scrollSpeed = -0x8000
+		
+		object.state++
+		break
+		
+	case STAGESEL_M_FADEIN
+		if object.timer > 0
+			object.timer -= 8
+		else
+			PlayMusic(2)
+			object.state++
+		end if
+		
+		SetScreenFade(0, 0, 0, object.timer)
+		break
+		
+	case STAGESEL_M_MAIN
+		if options.physicalControls == true
+			// All physical button interactions are checked here
+			
+			if keyPress[0].start == true
+				object.state = STAGESEL_M_FADE_STAGE
+				return
+			end if
+			
+			if keyPress[0].buttonB == true
+				object.state = STAGESEL_M_FADE_MENU
+				return
+			end if
+			
+			if touchscreen[0].down == true
+				options.physicalControls = false
+				object.selection = -1
+				object.pregDrag = 0
+				object.speed = 0
+				return
+			end if
+			
+			CallFunction(StageSelect_FindSelectionPos)
+			arrayPos1 = arrayPos0 // arrayPos1 = prevSelectionPos
+			
+			checkResult = false
+			temp1 = object.selection // prevSelection (ID)
+			
+			// Don't know where else to put this note so I may as well put it here - 
+			// Original KEH let you wrap around between top and bottom, we aren't doing that here though (yet)
+			
+			if keyPress[0].down == true
+				while checkResult == false
+					if object.selection > object.maxSel
+						object.selection = temp1
+						checkResult = true
+					else
+						object.selection++
+
+						CallFunction(StageSelect_FindSelectionPos)
+						CheckGreater(arrayPos0, -1)
+					end if
+				loop
+			end if
+			
+			if keyPress[0].up == true
+				while checkResult == false
+					if object.selection < 0
+						object.selection = temp1
+						checkResult = true
+					else
+						object.selection--
+						
+						CallFunction(StageSelect_FindSelectionPos)
+						CheckGreater(arrayPos0, -1)
+					end if
+				loop
+			end if
+			
+			CallFunction(StageSelect_FindSelectionPos)
+			
+			if object[arrayPos0].ypos != object[arrayPos1].ypos // Not directly comparing the two values just in case they're on the same Y pos (for some reason)
+				object.timer = 0
+				object.speed = 0
+				
+				if object[arrayPos0].ypos > object[arrayPos1].ypos
+					// We just moved down
+					
+					// temp0 = screen bottom
+					temp0 = screen.ysize
+					temp0 += screen.yoffset
+					
+					// temp1 = entry bottom
+					temp1 = object[arrayPos0].iypos
+					temp1 += 64
+					
+					if temp1 > temp0
+						object.state = STAGESEL_M_SCROLLDOWN
+					end if
+				else // object[arrayPos0].ypos < object[arrayPos1].ypos
+					// We just moved up
+					
+					temp0 = object[arrayPos0].iypos
+					temp0 -= 32
+					
+					if temp0 < screen.yoffset
+						object.state = STAGESEL_M_SCROLLUP
+					end if
+				end if
+			end if
+		else 
+			// Using touch controls
+			
+			// Check if we released a button
+			CheckTouchRect(0, 0, screen.xsize, screen.ysize)
+			if checkResult == TOUCHINPUT_NULL
+				if object.selection > -1
+					object.state = STAGESEL_M_FADE_STAGE
+					return
+				end if
+			end if
+			
+			// Now, do all the scrolling stuff
+			arrayPos0 = -1
+			
+			if object.pregDrag != 0
+				// When you're already dragging, then you can continue holding the screen from anywhere
+				CheckTouchRect(0, 0, screen.xsize, screen.ysize)
+				if checkResult > -1
+					arrayPos0 = checkResult
+				end if
+			else
+				// Left side of the screen
+				temp0 = screen.xcenter
+				temp0 -= 172
+				CheckTouchRect(0, 0, temp0, screen.ysize)
+				if checkResult > -1
+					arrayPos0 = checkResult
+				end if
+				
+				// Right side of the screen
+				temp1 = screen.xsize
+				temp1 -= temp0
+				CheckTouchRect(temp1, 0, screen.xsize, screen.ysize)
+				if checkResult > -1
+					arrayPos0 = checkResult
+				end if
+			end if
+			
+			if object.selection > -1
+				// If you're currently selecting things, then disable scrolling
+				arrayPos0 = -1
+			end if
+			
+			if arrayPos0 > -1
+				// Some finger's on the edges of the screen
+				
+				// Reset forced scroll while touching the screen
+				object.yvel = 0
+				
+				if object.pregDrag == 0
+					object.speed = 0
+					object.pregDrag = touchscreen[arrayPos0].ypos
+					
+					// bf pseudocode (ty hz)
+//					startdrag
+//					.001
+//					enddrag
+//					if touching
+//					setpos
+//					delta = enddrag - startdrag
+//					velocity = (velocity + delta + delta) / 3
+//					if !touching
+//					velocity = velocity / 2
+				else
+					// If you're out of bounds, lessen the effect of scrolling
+					CheckLower(screen.yoffset, object.boundsT)
+					temp1 = checkResult
+					CheckGreater(screen.yoffset, object.boundsB)
+					temp1 |= checkResult
+					temp1 <<= 6
+					temp1 += 2
+					
+					temp0 = touchscreen[arrayPos0].ypos
+					temp0 -= object.pregDrag
+					temp0 <<= 17 // shift once to double, shift by 16 to make it 16.16 fixed point
+					object.speed += temp0
+					object.speed /= temp1
+					
+					object.pregDrag = touchscreen[arrayPos0].ypos
+				end if
+			else
+				// Nope, no fingers on the sides
+				
+				object.pregDrag = 0
+				
+				if screen.yoffset < object.boundsT
+					object.speed = 0
+					object.yvel += 0xD000
+					
+					temp2 = object.yvel
+					temp2 >>= 16
+					screen.yoffset += temp2
+					
+					if screen.yoffset > object.boundsT
+						screen.yoffset = object.boundsT
+						object.yvel = 0
+					end if
+				end if
+				
+				if screen.yoffset > object.boundsB
+					object.speed = 0
+					object.yvel -= 0xD000
+					
+					temp2 = object.yvel
+					temp2 >>= 16
+					screen.yoffset += temp2
+					
+					if screen.yoffset < object.boundsB
+						screen.yoffset = object.boundsB
+						object.yvel = 0
+					end if
+				end if
+			end if
+			
+			object.selection = -1
+			
+			temp0 = object.speed
+			temp0 >>= 16
+			screen.yoffset += temp0
+			
+			// Deceleration of 0.5px per frame
+			
+			if object.speed > 0
+				object.speed -= 0x8000
+				
+				if object.speed < 0
+					object.speed = 0
+				end if
+			end if
+			
+			if object.speed < 0
+				object.speed += 0x8000
+				
+				if object.speed > 0
+					object.speed = 0
+				end if
+			end if
+			
+			if object.yvel == 0 // Is the player within bounds?
+				options.physicalControls = keyPress[0].down
+				options.physicalControls |= keyPress[0].up
+			end if
+			
+			if options.physicalControls == true
+				object.speed = 0
+				
+				// Find the selection that's closest to the top of the screen and still in full view
+				temp0 = 0x7FFFFFFF // minDist
+				
+				foreach (object.type, arrayPos0, ACTIVE_ENTITIES)
+					if object[arrayPos0].entityPos != object.entityPos
+						temp1 = object[arrayPos0].iypos
+						temp1 -= screen.yoffset
+						if temp1 < 0
+							temp1 = 0x7FFFFFFF
+						end if
+						
+						if temp1 < temp0
+							temp0 = temp1
+							object.selection = object[arrayPos0].propertyValue
+						end if
+					end if
+				next
+			end if
+		end if
+		break
+		
+	case STAGESEL_M_SCROLLDOWN
+		// Scrolling down
+		
+		object.speed += 0x20000
+		
+		temp0 = object.speed
+		temp0 >>= 16
+		screen.yoffset += temp0
+		
+		CallFunction(StageSelect_FindSelectionPos)
+		temp0 = object[arrayPos0].iypos
+		temp0 += 64
+		
+		temp1 = screen.ysize
+		temp1 += screen.yoffset
+		
+		if temp1 >= temp0
+			screen.yoffset = temp0
+			screen.yoffset -= screen.ysize
+			
+			object.state = STAGESEL_M_MAIN
+		end if
+		break
+		
+	case STAGESEL_M_SCROLLUP
+		// Scrolling up
+		
+		object.speed += 0x20000
+		
+		temp0 = object.speed
+		temp0 >>= 16
+		screen.yoffset -= temp0
+		
+		CallFunction(StageSelect_FindSelectionPos)
+		temp0 = object[arrayPos0].iypos
+		temp0 -= 32
+		
+		if screen.yoffset <= temp0
+			screen.yoffset = temp0
+			
+			object.state = STAGESEL_M_MAIN
+		end if
+		break
+
+	case STAGESEL_M_FADE_STAGE
+		if object.timer < 256
+			object.timer += 8
+			music.volume -= 2
+			SetScreenFade(0, 0, 0, object.timer)
+		else
+			CallFunction(StageSelect_FindSelectionPos)
+			stage.listPos = object[arrayPos0].listPos
+			stage.activeList = object[arrayPos0].activeList
+			
+			player.lives = 3
+			//stage.playerListPos = saved.character
+			stage.playerListPos = 0
+
+			LoadStage()
+			StopMusic()
+			SetScreenFade(0, 0, 0, 0xFF)
+		end if
+		break
+		
+	case STAGESEL_M_FADE_MENU
+		if object.timer < 256
+			object.timer += 8
+			music.volume -= 2
+			SetScreenFade(0, 0, 0, object.timer)
+		else
+			foreach (object.type, arrayPos0, ACTIVE_ENTITIES)
+				object[arrayPos0].priority = 5
+			next
+			
+			CreateTempObject(TypeName[Menu Control], 0, 0, 0)
+			object[tempObjectPos].priority = 1
+			
+			StopMusic()
+			SetScreenFade(0, 0, 0, 0xFF)
+		end if
+		break
+		
+	case STAGESEL_B_MAIN // Button state
+		arrayPos0 = object.master
+		
+		CheckNotEqual(object[arrayPos0].pregDrag, 0)
+		checkResult |= options.physicalControls
+		if checkResult == false
+			temp0 = object.ixpos
+			temp0 -= screen.xoffset
+			temp0 -= 168 // object.drawWidth / 2
+			
+			temp1 = object.iypos
+			temp1 -= screen.yoffset
+			
+			temp2 = temp0
+			temp2 += object.drawWidth
+			temp2 += 3
+			
+			temp3 = temp1
+			temp3 += object.drawHeight
+			temp3 += 3
+			
+			CheckTouchRect(temp0, temp1, temp2, temp3)
+			if checkResult > TOUCHINPUT_NULL
+				object[arrayPos0].selection = object.propertyValue
+			end if
+		end if
+		break
+		
+	end switch
+end event
+
+
+event ObjectDraw
+	if object.propertyValue == 255
+		// Master (Header)
+		object.spriteSheet = object.mainSheet
+		DrawSprite(0)
+	else
+		// We're a stage entry... we got a whole lot to do...
+		
+		arrayPos0 = object.master
+		
+		// Draw the box
+		object.drawPos.x = object.ixpos
+		object.drawPos.x -= screen.xoffset
+		object.drawPos.x -= 168 // object.drawWidth / 2
+		object.drawPos.y = object.iypos
+		object.drawPos.y -= screen.yoffset
+		CheckNotEqual(object.propertyValue, object[arrayPos0].selection)
+		checkResult *= 0xE0
+		object.drawColour.g = checkResult
+		CallFunction(MenuControl_DrawBox)
+
+		// Draw with the Main sheet for now
+		object.spriteSheet = object.mainSheet
+			
+		// Draw all the texts
+		// (Tic Marks, Score, Rings, Play Count, Time, Deaths, Rank, ...)
+		temp0 = 4
+		while temp0 < 11
+			DrawSprite(temp0)
+			temp0++
+		loop
+		
+		// Switch to the Icons sheet and palette now that we're drawing the, well, icon
+		object.spriteSheet = object.iconSheet
+		SetActivePalette(1, 0, screen.ysize)
+
+		// Draw the zone's icon
+		DrawSprite(object.iconFrame)
+		
+		// Back to the main sheet and palette now!
+		object.spriteSheet = object.mainSheet
+		SetActivePalette(0, 0, screen.ysize)
+
+		// Draw the zone's name
+		DrawSprite(object.nameFrame)
+
+		// Now, all the numbers!
+
+		object.drawPos.x += 171
+
+		// Score
+		object.drawPos.y += 25
+		DrawNumbers(STAGESEL_SPR_NUMBERS, object.drawPos.x, object.drawPos.y, object.score, 6, 8, false)
+
+		// Rings count
+		object.drawPos.y += 16
+		DrawNumbers(STAGESEL_SPR_NUMBERS, object.drawPos.x, object.drawPos.y, object.rings, 3, 8, false)
+
+		// Play count
+		object.drawPos.y -= 34
+		object.drawPos.x += 153
+		DrawNumbers(STAGESEL_SPR_NUMBERS, object.drawPos.x, object.drawPos.y, object.playCount, 3, 8, false)
+
+		// Time - milliseconds
+		object.drawPos.y += 12
+		DrawNumbers(STAGESEL_SPR_NUMBERS, object.drawPos.x, object.drawPos.y, object.milliseconds, 2, 8, true)
+
+		// Time - seconds
+		object.drawPos.x -= 27
+		DrawNumbers(STAGESEL_SPR_NUMBERS, object.drawPos.x, object.drawPos.y, object.seconds, 2, 8, true)
+
+		// Time - minutes
+		object.drawPos.x -= 23
+		DrawNumbers(STAGESEL_SPR_NUMBERS, object.drawPos.x, object.drawPos.y, object.minutes, 2, 8, false)
+
+		// Death counter
+		object.drawPos.x += 50
+		object.drawPos.y += 12
+		DrawNumbers(STAGESEL_SPR_NUMBERS, object.drawPos.x, object.drawPos.y, object.deaths, 3, 8, false)
+
+		// Here would be rank... if there was one
+		// (For now, let's just have a little dash placeholder)
+		object.drawPos.y += 12
+		DrawSpriteScreenXY(object.rank, object.drawPos.x, object.drawPos.y)
+	end if
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("Menu/Menu.gif")
+	temp7 = object.spriteSheet
+	LoadSpriteSheet("Menu/Icons.gif")
+	temp6 = object.spriteSheet
+	
+	// These frames are for the "Menu" sheet
+	SpriteFrame(-71, 0, 142, 7, 128, 185)   // 0 - "Select a Stage"
+	
+	SpriteFrame(0, 0, 8, 7, 104, 17)   // 1 - Rank placeholder
+	
+	SpriteFrame(-20, -6, 40, 20, 85, 105)  // 2 - Blue back arrow
+	SpriteFrame(-20, -6, 40, 20, 85, 125)  // 3 - Red back arrow
+	
+	SpriteFrame(116, 19, 30, 7, 82, 0) // 4 - Time tick marks
+	SpriteFrame(-125, 25, 45, 7, 0, 8) // 5 - Score:
+	SpriteFrame(-125, 41, 45, 7, 46, 8) // 6 - Rings:
+	SpriteFrame(39, 7, 85, 7, 0, 184)  // 7 - Play Count:
+	SpriteFrame(39, 19, 37, 7, 10, 15) // 8 - Time:
+	SpriteFrame(39, 31, 53, 7, 10, 143) // 9 - Deaths:
+	SpriteFrame(39, 43, 37, 7, 91, 8) // 10 - Rank:
+	
+	// 11-20 - Numbers (STAGESEL_SPR_NUMBERS)
+	temp0 = 0
+	temp1 = 0
+	while temp0 < 10
+		SpriteFrame(0, 0, 8, 7, temp1, 25)
+		temp1 += 8
+		temp0++
+	loop
+	
+	// These frames are for the "Icons" sheet
+	// 21-44 - Stage Icons (STAGESEL_SPR_STGICONS)
+	temp3 = 0
+	temp2 = 0
+	while temp3 < 3
+		// Top row
+		temp0 = 0
+		temp1 = 0
+		while temp0 < 8
+			SpriteFrame(-161, 16, 32, 24, temp1, temp2)
+			temp1 += 32
+			temp0++
+		loop
+		
+		temp1 = 0
+		temp2 += 24
+		temp3++
+	loop
+	
+	// Now, all the frames are back to the "Menu" sheet
+	// 45-67 - Stage Names (STAGESEL_SPR_STGNAMES)
+	temp0 = 0
+	temp1 = 192
+	while temp0 < SELECTION_STGSEL_COUNT
+		SpriteFrame(-125, 9, 135, 7, 0, temp1)
+		temp1 += 7
+		temp0++
+	loop
+	
+	// All the Stage Select icons get their own sheet, since they use up quite a bit of palette space
+	LoadPalette("KEHDX_MenuIcons.act", 1, 0, 0, 256)
+	
+	SetMusicTrack("2D.ogg", 2, 108000)
+	
+	arrayPos2 = -1 // masterPos
+	
+	foreach (TypeName[Stage Select], arrayPos0, ALL_ENTITIES)
+		switch object[arrayPos0].propertyValue
+		case 255
+			// Add the Master object to the control object list
+			SetTableValue(object[arrayPos0].entityPos, 1, MenuControl_controls)
+			
+			object[arrayPos0].boundsT = object[arrayPos0].iypos
+			object[arrayPos0].boundsT -= 16
+			
+			arrayPos2 = arrayPos0
+			break
+			
+		default
+			// KEHDX TODO: 300 values per save? if there's only 5 values per save then we could trim down a bit,
+			//       and add something cool like replays in place instead with all that freed room
+			
+			arrayPos1 = 300
+			arrayPos1 *= object[arrayPos0].propertyValue
+			
+			object[arrayPos0].score = saveRAM[arrayPos1]
+			
+			arrayPos1++
+			object[arrayPos0].rings = saveRAM[arrayPos1]
+			
+			arrayPos1++
+			object[arrayPos0].playCount = saveRAM[arrayPos1]
+			
+			arrayPos1++
+			if saveRAM[arrayPos1] == 0
+				// If uninitialised, then add in a really long time
+				saveRAM[arrayPos1] = 59999
+			end if
+			
+			object[arrayPos0].milliseconds = saveRAM[arrayPos1]
+			
+			object[arrayPos0].minutes = object[arrayPos0].milliseconds
+			object[arrayPos0].minutes /= 6000
+			
+			object[arrayPos0].milliseconds %= 6000
+			
+			object[arrayPos0].seconds = object[arrayPos0].milliseconds
+			object[arrayPos0].seconds /= 100
+			
+			object[arrayPos0].milliseconds %= 100
+			
+			arrayPos1++
+			object[arrayPos0].deaths = saveRAM[arrayPos1]
+			
+			// (Placeholder)
+			object[arrayPos0].rank = 1
+			
+			object[arrayPos0].state = STAGESEL_B_MAIN
+			
+			object[arrayPos0].master = arrayPos2
+			
+			object[arrayPos0].drawWidth = 336
+			object[arrayPos0].drawHeight = 55
+			object[arrayPos0].drawColour.r = 0xE0
+			object[arrayPos0].drawColour.b = 0x00
+			
+			object[arrayPos0].iconFrame = object[arrayPos0].propertyValue
+			object[arrayPos0].iconFrame += STAGESEL_SPR_STGICONS
+			
+			object[arrayPos0].nameFrame = object[arrayPos0].propertyValue
+			object[arrayPos0].nameFrame += STAGESEL_SPR_STGNAMES
+			
+			if object[arrayPos0].propertyValue > object[arrayPos2].maxSel
+				object[arrayPos2].maxSel = object[arrayPos0].propertyValue
+			end if
+			
+			if object[arrayPos0].iypos > object[arrayPos2].boundsB
+				object[arrayPos2].boundsB = object[arrayPos0].iypos
+			end if
+			break
+			
+		end switch
+		
+		object[arrayPos0].mainSheet = temp7
+		object[arrayPos0].iconSheet = temp6
+	next
+end event
+
+
+// ========================
+// Editor Events
+// ========================
+
+event RSDKEdit
+	if editor.returnVariable == true
+		switch editor.variableID
+		case EDIT_VAR_PROPVAL // property value
+		case 0 // id
+			checkResult = object.propertyValue
+			break
+			
+		end switch
+	else
+		switch editor.variableID
+		case EDIT_VAR_PROPVAL // property value
+		case 0 // id
+			object.propertyValue = editor.variableValue
+			break
+			
+		end switch
+	end if
+end event
+
+
+event RSDKDraw
+	DrawSprite(0)
+end event
+
+
+event RSDKLoad
+	LoadSpriteSheet("Menu/Menu.gif")
+	SpriteFrame(-80, -8, 159, 16, 128, 113)
+	
+	AddEditorVariable("id")
+	SetActiveVariable("id")
+	AddEnumVariable("Master", 255)
+	
+	// and now all the stages
+	AddEnumVariable("EHZ", 0)
+	AddEnumVariable("CPZ", 1)
+	AddEnumVariable("ARZ", 2)
+	AddEnumVariable("CNZ", 3)
+	AddEnumVariable("HTZ", 4)
+	AddEnumVariable("MCZ", 5)
+	AddEnumVariable("OOZ", 6)
+	AddEnumVariable("MPZ", 7)
+	AddEnumVariable("WFZ", 8)
+	AddEnumVariable("HPZ", 9)
+	AddEnumVariable("GHZ", 10)
+	AddEnumVariable("MZ",  11)
+	AddEnumVariable("SYZ", 12)
+	AddEnumVariable("LZ", 13)
+	AddEnumVariable("SLZ", 14)
+	AddEnumVariable("SBZ", 15)
+	AddEnumVariable("PPZ", 16)
+	AddEnumVariable("CCZ", 17)
+	AddEnumVariable("TTZ", 18)
+	AddEnumVariable("QQZ", 19)
+end event

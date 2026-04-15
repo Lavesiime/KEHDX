@@ -1,0 +1,374 @@
+// ----------------------------------
+// RSDK Project: Knuckles' Emerald Hunt
+// Script Description: Main Menu Object
+// Script Author: Lave sIime
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+private alias object.value0 : object.timer
+private alias object.value3 : object.selection
+private alias object.value5 : object.master
+
+// States
+// Format is [object name]-[type initial]-[state name], though all non-Master objects only have one state so initial and state name are the same
+private alias 0 : MAINMENU_M_SETUP
+private alias 1 : MAINMENU_M_FADEIN
+private alias 2 : MAINMENU_M_MAIN
+private alias 3 : MAINMENU_M_FADEOUT
+
+private alias 4 : MAINMENU_C_CURSOR
+private alias 5 : MAINMENU_B_BUTTON
+private alias 6 : MAINMENU_D_DX
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	switch object.state
+	case MAINMENU_M_SETUP
+		temp0 = object.selection
+		
+		if temp0 == 0
+			temp0 = 1
+		end if
+		
+		CallFunction(MenuControl_CInit)
+		
+		object.selection = temp0
+		
+		object.timer = 320
+		
+		// Set BG speed, 1.0 pixel per frame
+		tileLayer[1].scrollSpeed = -0x10000
+		hParallax[0].scrollSpeed = -0x10000
+		
+		SetScreenFade(0, 0, 0, object.timer)
+		object.state++
+		break
+
+	case MAINMENU_M_FADEIN
+		if object.timer > 0
+			object.timer -= 8
+		else
+			PlayMusic(1)
+			object.timer = 0
+			object.state++
+		end if
+
+		SetScreenFade(0, 0, 0, object.timer)
+		break
+		
+	case MAINMENU_M_MAIN
+		if options.physicalControls == true
+			if keyPress[0].up == true
+				PlaySfx(SfxName[Score Add], false)
+				
+				object.selection--
+				if object.selection < 1
+					object.selection = 4
+				end if
+			end if
+			
+			if keyPress[0].down == true
+				PlaySfx(SfxName[Score Add], false)
+				
+				object.selection++
+				if object.selection > 4
+					object.selection = 1
+				end if
+			end if
+			
+			if keyPress[0].start == true
+				object.state++
+			end if
+			
+			if touchscreen[0].down == true
+				options.physicalControls = false
+				object.selection = SELECTION_NULL
+			end if
+		else
+			CheckTouchRect(0, 0, screen.xsize, screen.ysize)
+			if checkResult == TOUCHINPUT_NULL
+				if object.selection > 0
+					object.state++
+				else
+					object.selection = -1
+				end if
+			end if
+			
+			if object.state == MAINMENU_M_MAIN
+				options.physicalControls = keyPress[0].down
+				options.physicalControls |= keyPress[0].up
+				
+				if options.physicalControls == true
+					object.selection = 1
+				end if
+			end if
+		end if
+		break
+		
+	case MAINMENU_M_FADEOUT
+		if object.timer < 256
+			object.timer += 8
+			music.volume -= 2
+			SetScreenFade(0, 0, 0, object.timer)
+		else
+			foreach (object.type, arrayPos0, ACTIVE_ENTITIES)
+				object[arrayPos0].priority = 5
+			next
+			
+			CreateTempObject(TypeName[Menu Control], object.selection, 0, 0)
+			object[tempObjectPos].priority = 1
+			
+			StopMusic()
+			
+			SetScreenFade(0, 0, 0, 0xFF)
+		end if
+		break
+		
+	// end of Master states
+	
+	case MAINMENU_C_CURSOR // Knuckles Cursor State
+		object.animationTimer++
+		object.animationTimer %= 60
+		GetBit(object.frame, object.animationTimer, 5)
+		object.frame += 5
+		
+		arrayPos0 = -1
+		arrayPos1 = object.master
+		
+		foreach (object.type, arrayPos7, ACTIVE_ENTITIES)
+			if object[arrayPos7].propertyValue == object[arrayPos1].selection
+				arrayPos0 = arrayPos7
+			end if
+		next
+		
+		if arrayPos0 > -1
+			object.xpos = object[arrayPos0].xpos
+			object.ypos = object[arrayPos0].ypos
+		else
+			object.xpos = 0x7FFF0000
+			object.ypos = 0x7FFF0000
+		end if
+		break
+		
+	case MAINMENU_B_BUTTON // Button State
+		arrayPos0 = object.master
+		
+		CheckNotEqual(object[arrayPos0].state, MAINMENU_M_MAIN)
+		checkResult |= options.physicalControls
+		if checkResult == false
+			// Left
+			temp0 = object.ixpos
+			temp0 -= 80
+			temp0 -= screen.xoffset
+			
+			// Top
+			temp1 = object.iypos
+			temp1 -= 10
+			temp1 -= screen.yoffset
+			
+			// Right
+			temp2 = temp0
+			temp2 += 180
+			
+			// Bottom
+			temp3 = temp1
+			temp3 += 20
+			
+			CheckTouchRect(temp0, temp1, temp2, temp3)
+			if checkResult > TOUCHINPUT_NULL
+				object[arrayPos0].selection = object.propertyValue
+			end if
+		end if
+		break
+		
+	case MAINMENU_D_DX // DX flash object
+		if object.timer > -1
+			object.timer++
+			if object.timer > 120
+				temp0 = object.timer
+				temp0 -= 140
+				Sin(object.alpha, temp0)
+				
+				if object.timer > 160
+					object.timer = -1
+				end if
+			end if
+		else
+			object.alpha = 0
+		end if
+		break
+		
+	end switch // object.state
+end event
+
+
+event ObjectDraw
+	DrawSpriteFX(object.frame, FX_INK, object.xpos, object.ypos)
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("Menu/Menu.gif")
+	
+	// 0 - Knuckles' Emerald Hunt, DX!
+	SpriteFrame(-142, -3, 284, 113, 128, 0)
+	
+	// 1 - "Single Player"
+	SpriteFrame(-80, -10, 159, 17, 128, 113)
+	
+	// 2 - "Competition"
+	SpriteFrame(-80, -10, 159, 16, 128, 131)
+	
+	// 3 - "Options"
+	SpriteFrame(-80, -10, 100, 16, 412, 0)
+	
+	// 4 - "Credits"
+	SpriteFrame(-80, -10, 100, 16, 412, 17)
+	
+	// 5-6 - Tiny Knuckles cursor frames
+	SpriteFrame(-109, -14, 23, 22, 271, 165)
+	SpriteFrame(-109, -14, 24, 22, 295, 165)
+	
+	// 7 - Website link (https://mm.reimuhakurei.net/?page=kehDX)
+	SpriteFrame(-152, -5, 304, 10, 138, 250)
+	
+	// 8 - Isolated "DX" (for the flash)
+	SpriteFrame(52, 62, 90, 48, 136, 261)
+	
+	SetMusicTrack("SPPMenu.ogg", 1, 214596)
+	
+	arrayPos1 = -1
+	
+	foreach (TypeName[Main Menu], arrayPos0, ALL_ENTITIES)
+		object[arrayPos0].frame = object[arrayPos0].propertyValue
+		
+		switch object[arrayPos0].propertyValue
+		case 0 // Master
+			// Store the Master pos (used for buttons, check out right down below)
+			arrayPos1 = arrayPos0
+			break
+			
+		case 1 // Single Player Button
+		case 2 // Competition Button
+		case 3 // Options Button
+		case 4 // Credits Button
+			object[arrayPos0].state = MAINMENU_B_BUTTON
+			object[arrayPos0].master = arrayPos1
+			break
+			
+		case 5
+			object[arrayPos0].state = MAINMENU_C_CURSOR
+			object[arrayPos0].master = arrayPos1
+			break
+			
+		case 7 // Website Link
+		default
+			object[arrayPos0].state = -1
+			object[arrayPos0].master = arrayPos1
+			break
+			
+		case 8
+			object[arrayPos0].state = MAINMENU_D_DX
+			object[arrayPos0].inkEffect = 3 // INK_ADD
+			break
+			
+		end switch
+	next
+end event
+
+
+// ========================
+// Editor Events
+// ========================
+
+event RSDKEdit
+	if editor.returnVariable == true
+		switch editor.variableID
+		case EDIT_VAR_PROPVAL // property value
+		case 0 // id
+			checkResult = object.propertyValue
+			break
+			
+		end switch
+	else
+		switch editor.variableID
+		case EDIT_VAR_PROPVAL // property value
+		case 0 // id
+			object.propertyValue = editor.variableValue
+			break
+			
+		end switch
+	end if
+end event
+
+
+event RSDKDraw
+	DrawSprite(object.propertyValue)
+	
+	if object.propertyValue == 0
+		editor.drawingOverlay = true
+		
+		if editor.showGizmos == true
+			arrayPos0 = object.entityPos
+			while object[arrayPos0].type == object.type
+				DrawArrow(object.xpos, object.ypos, object[+arrayPos0].xpos, object[+arrayPos0].ypos, 255, 255, 0)
+				
+				arrayPos0++
+			loop
+		end if
+		
+		// Bounds box is drawn regardless of whether the object's selected or not
+		temp0 = 512; temp1 = 256; temp2 = 512; temp3 = 256;
+		CallFunction(EditorHelpers_DrawHitbox)
+		
+		editor.drawingOverlay = false
+	end if
+end event
+
+
+event RSDKLoad
+	LoadSpriteSheet("Menu/Menu.gif")
+	
+	// 0 - Knuckles' Emerald Hunt, DX!
+	SpriteFrame(-142, -3, 284, 113, 128, 0)
+	
+	// 1 - "Single Player"
+	SpriteFrame(-80, -10, 159, 19, 128, 113)
+	
+	// 2 - "Competition"
+	SpriteFrame(-80, -10, 159, 16, 128, 131)
+	
+	// 3 - "Options"
+	SpriteFrame(-80, -10, 100, 16, 412, 0)
+	
+	// 4 - "Credits"
+	SpriteFrame(-80, -10, 100, 16, 412, 17)
+	
+	// 5-6 - Tiny Knuckles cursor frames
+	SpriteFrame(-109, -11, 23, 22, 271, 165)
+	SpriteFrame(-109, -11, 24, 22, 295, 165)
+	
+	// 7 - Website link (https://mm.reimuhakurei.net/?page=kehDX)
+	SpriteFrame(-152, -5, 304, 10, 138, 250)
+	
+	// 8 - Isolated "DX" (for the flash)
+	SpriteFrame(52, 62, 90, 48, 136, 261)
+	
+	AddEditorVariable("id")
+	SetActiveVariable("id")
+	AddEnumVariable("Master", 0)
+	AddEnumVariable("Single Player Button", 1)
+	AddEnumVariable("Competition Button", 2)
+	AddEnumVariable("Options Button", 3)
+	AddEnumVariable("Credits Button", 4)
+	AddEnumVariable("Knuckles Cursor", 5)
+	AddEnumVariable("Website Link", 7)
+	AddEnumVariable("DX", 8)
+end event

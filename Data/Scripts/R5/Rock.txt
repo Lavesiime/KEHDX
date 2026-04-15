@@ -1,0 +1,275 @@
+// ----------------------------------
+// RSDK Project: Sonic CD
+// Script Description: Rock Object
+// Script Author: Christian Whitehead/Simon Thomley
+// Unpacked by Rubberduckycooly's script unpacker
+// ----------------------------------
+
+// ========================
+// Aliases
+// ========================
+
+private alias object.value0 : object.startPos.y
+
+private alias 0 : ROCK_IDLE
+private alias 1 : ROCK_INVISWALL
+private alias 2 : ROCK_INVISROOF
+private alias 3 : ROCK_DROP_IDLE
+private alias 4 : ROCK_DROP_FALL
+private alias 5 : ROCK_DROP_WAITFORRESPAWN
+private alias 6 : ROCK_DROP_FRAGMENT1
+private alias 7 : ROCK_DROP_FRAGMENT2
+private alias 8 : ROCK_DROP_FRAGMENT3
+private alias 9 : ROCK_DROP_FRAGMENT4
+
+// Player Aliases
+private alias object.xpos : player.xpos
+private alias object.ypos : player.ypos
+private alias object.speed : player.speed
+private alias object.collisionMode : player.collisionMode
+private alias object.collisionLeft : player.collisionLeft
+private alias object.collisionRight : player.collisionRight
+private alias object.collisionBottom : player.collisionBottom
+
+private alias object.value17 : debugMode.currentSelection
+
+// Path ID Aliases
+private alias 0 : PATH_A
+
+
+// ========================
+// Function Declarations
+// ========================
+
+reserve function Rock_DebugDraw
+reserve function Rock_DebugSpawn
+
+
+// ========================
+// Static Values
+// ========================
+
+private value Rock_startDebugID
+
+
+// ========================
+// Function Definitions
+// ========================
+
+private function Rock_DebugDraw
+	temp0 = debugMode[0].currentSelection
+	temp0 -= Rock_startDebugID
+	temp0 *= ROCK_DROP_IDLE
+	DrawSprite(temp0)
+end function
+
+
+private function Rock_DebugSpawn
+	temp0 = debugMode[0].currentSelection
+	temp0 -= Rock_startDebugID
+	temp0 *= ROCK_DROP_IDLE
+	CreateTempObject(TypeName[Rock], temp0, object.xpos, object.ypos)
+	object[tempObjectPos].startPos.y = object[tempObjectPos].ypos
+end function
+
+
+// ========================
+// Events
+// ========================
+
+event ObjectUpdate
+	switch object.propertyValue
+	case ROCK_IDLE
+		foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+			BoxCollisionTest(C_SOLID, object.entityPos, -16, -16, 16, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+		next
+		break
+		
+	case ROCK_INVISWALL
+		foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+			BoxCollisionTest(C_SOLID, object.entityPos, -16, -14, 16, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+			if checkResult == true
+				if player[currentPlayer].xpos < object.xpos
+					player[currentPlayer].xpos = player[currentPlayer].collisionLeft
+					player[currentPlayer].xpos <<= 16
+					player[currentPlayer].xpos += object.xpos
+					player[currentPlayer].xpos -= 0x100000
+				else
+					player[currentPlayer].xpos = player[currentPlayer].collisionRight
+					player[currentPlayer].xpos <<= 16
+					player[currentPlayer].xpos += object.xpos
+					player[currentPlayer].xpos += 0x100000
+				end if
+			end if
+		next
+		break
+		
+	case ROCK_INVISROOF
+		foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+			if player[currentPlayer].collisionMode == CMODE_LWALL
+				BoxCollisionTest(C_TOUCH, object.entityPos, -16, -16, 16, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+				if checkResult == true
+					player[currentPlayer].ypos = player[currentPlayer].collisionBottom
+					player[currentPlayer].ypos <<= 16
+					player[currentPlayer].ypos += object.ypos
+					player[currentPlayer].ypos += 0x100000
+					player[currentPlayer].speed = 0
+				end if
+			end if
+			
+			if player[currentPlayer].collisionMode == CMODE_RWALL
+				BoxCollisionTest(C_TOUCH, object.entityPos, -16, -16, 16, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+				if checkResult == true
+					player[currentPlayer].ypos = player[currentPlayer].collisionBottom
+					player[currentPlayer].ypos <<= 16
+					player[currentPlayer].ypos += object.ypos
+					player[currentPlayer].ypos += 0x100000
+					player[currentPlayer].speed = 0
+				end if
+			end if
+		next
+		break
+		
+	case ROCK_DROP_IDLE
+		foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+			BoxCollisionTest(C_SOLID, object.entityPos, -16, -16, 16, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+			
+			BoxCollisionTest(C_TOUCH, object.entityPos, -4, 0, 4, 96, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+			if checkResult == true
+				object.priority = PRIORITY_ACTIVE
+				object.propertyValue = ROCK_DROP_FALL
+			end if
+		next
+		break
+		
+	case ROCK_DROP_FALL
+		if object.yvel < 0x80000
+			object.yvel += 0x4000
+		end if
+		
+		object.ypos += object.yvel
+		
+		temp0 = false // (should we break this frame?)
+		
+		if object.yvel > 0x20000
+			ObjectTileCollision(CSIDE_FLOOR, 0, 12, PATH_A)
+			temp0 |= checkResult
+		end if
+		
+		foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
+			BoxCollisionTest(C_SOLID, object.entityPos, -16, -16, 12, 16, currentPlayer, C_BOX, C_BOX, C_BOX, C_BOX)
+			if checkResult == COL_BOTTOM
+				CallFunction(Player_Hit)
+				
+				temp0 |= true
+			end if
+		next
+		
+		if temp0 == true
+			PlaySfx(SfxName[Explosion], false)
+			
+			CreateTempObject(TypeName[Drop Rock], ROCK_DROP_FRAGMENT1, object.xpos, object.ypos)
+			object[tempObjectPos].xpos -= 0x80000
+			object[tempObjectPos].ypos -= 0x80000
+			object[tempObjectPos].xvel = -0x10000
+			object[tempObjectPos].yvel = -0x40000
+			object[tempObjectPos].drawOrder = 5
+			
+			CreateTempObject(TypeName[Drop Rock], ROCK_DROP_FRAGMENT2, object.xpos, object.ypos)
+			object[tempObjectPos].xpos += 0x80000
+			object[tempObjectPos].ypos -= 0x80000
+			object[tempObjectPos].xvel = 0x10000
+			object[tempObjectPos].yvel = -0x40000
+			object[tempObjectPos].drawOrder = 5
+			
+			CreateTempObject(TypeName[Drop Rock], ROCK_DROP_FRAGMENT3, object.xpos, object.ypos)
+			object[tempObjectPos].xpos -= 0x80000
+			object[tempObjectPos].ypos += 0x80000
+			object[tempObjectPos].xvel = -0x20000
+			object[tempObjectPos].yvel = -0x30000
+			object[tempObjectPos].drawOrder = 5
+			
+			CreateTempObject(TypeName[Drop Rock], ROCK_DROP_FRAGMENT4, object.xpos, object.ypos)
+			object[tempObjectPos].xpos += 0x80000
+			object[tempObjectPos].ypos += 0x80000
+			object[tempObjectPos].xvel = 0x20000
+			object[tempObjectPos].yvel = -0x30000
+			object[tempObjectPos].drawOrder = 5
+			
+			// KEHDX TODO: the s2 explosion is kinda iffy here..
+			CreateTempObject(TypeName[Explosion], 0, object.xpos, object.ypos)
+			object[tempObjectPos].drawOrder = 5
+			
+			object.propertyValue = ROCK_DROP_WAITFORRESPAWN
+			object.yvel = 0
+		end if
+		break
+		
+	case ROCK_DROP_WAITFORRESPAWN
+		if object.outOfBounds == true
+			object.ypos = object.startPos.y
+			object.priority = PRIORITY_BOUNDS
+			object.propertyValue = ROCK_DROP_IDLE
+		end if
+		break
+		
+	case ROCK_DROP_FRAGMENT1
+	case ROCK_DROP_FRAGMENT2
+	case ROCK_DROP_FRAGMENT3
+	case ROCK_DROP_FRAGMENT4
+		object.xpos += object.xvel
+		object.yvel += 0x4000
+		object.ypos += object.yvel
+		
+		if object.outOfBounds == true
+			object.type = TypeName[Blank Object]
+		end if
+		break
+		
+	end switch
+end event
+
+
+event ObjectDraw
+	DrawSprite(object.propertyValue)
+end event
+
+
+event ObjectStartup
+	LoadSpriteSheet("R5/Objects.gif")
+	
+	// 0 - Static Rock Frame
+	SpriteFrame(-16, -16, 32, 32, 92, 18)
+
+	// 1-2 - Invisible Frames
+	SpriteFrame(0, 0, 0, 0, 1, 1)
+	SpriteFrame(0, 0, 0, 0, 1, 1)
+	
+	// 3-4 - Drop Rock Frame
+	SpriteFrame(-16, -16, 32, 32, 92, 18) // (Idle)
+	SpriteFrame(-16, -16, 32, 32, 92, 18) // (Falling)
+	
+	// 5 - Invisible Frame
+	SpriteFrame(0, 0, 0, 0, 1, 1)
+	
+	// 6-9 - Drop Rock Fragments
+	SpriteFrame(-8, -8, 16, 16, 92, 18)
+	SpriteFrame(-8, -8, 16, 16, 108, 18)
+	SpriteFrame(-8, -8, 16, 16, 92, 34)
+	SpriteFrame(-8, -8, 16, 16, 108, 34)
+	
+	foreach (TypeName[Rock], arraypos0, ALL_ENTITIES)
+		object[arraypos0].startPos.y = object[arraypos0].ypos
+	next
+	
+	temp0 = 0
+	Rock_startDebugID = DebugMode_ObjCount
+	while temp0 < 2
+		SetTableValue(TypeName[Rock], DebugMode_ObjCount, DebugMode_TypesTable)
+		SetTableValue(Rock_DebugDraw, DebugMode_ObjCount, DebugMode_DrawTable)
+		SetTableValue(Rock_DebugSpawn, DebugMode_ObjCount, DebugMode_SpawnTable)
+		DebugMode_ObjCount++
+		temp0++
+	loop
+end event
+

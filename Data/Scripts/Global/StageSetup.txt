@@ -34,7 +34,8 @@ private alias  3 : SELECTION_MAX
 
 private alias object.value3 : object.pause.drawnBG
 private alias object.value4 : object.pause.usingTouch
-private alias object.value5 : object.pause.drawit
+
+private alias object.visible : object.pause.visible
 
 // Menu Boot Mode Aliases
 private alias 3 : BOOTMODE_STAGESELECT
@@ -173,158 +174,6 @@ end function
 
 event ObjectUpdate
 	switch stage.state
-	case STAGE_PAUSED
-		foreach (TypeName[Title Card], arrayPos0, ALL_ENTITIES)
-			// Nope, no pausing when the level's not even started yet!
-			object.pause.state = PAUSE_INIT
-		next
-		
-		switch object.pause.state
-		case PAUSE_INIT
-			// Init
-			object.pause.state++
-			object.pause.usingTouch = false
-			object.pause.drawnBG = false		
-
-			//Not yet
-			object.pause.drawit = false
-
-			// Not falling through on purpose, we want a one frame delay
-			break
-			
-		case PAUSE_MAIN
-
-			//Let the menu draw now
-			object.pause.drawit = true
-
-			if object.pause.usingTouch == false
-				if keyPress[0].up == true
-					object.pause.selection--
-					if object.pause.selection < SELECTION_CONTINUE
-						object.pause.selection = SELECTION_EXIT
-					end if
-					
-					PlaySfx(SfxName[Menu Move], false)
-				end if
-				
-				if keyPress[0].down == true
-					object.pause.selection++
-					if object.pause.selection > SELECTION_EXIT
-						object.pause.selection = SELECTION_CONTINUE
-					end if
-					
-					PlaySfx(SfxName[Menu Move], false)
-				end if
-				
-				temp0 = keyPress[0].buttonA
-				temp0 |= keyPress[0].buttonB
-				temp0 |= keyPress[0].buttonC
-				temp0 |= keyPress[0].start
-				if temp0 == true
-					object.pause.timer = 0
-					
-					object.pause.state = PAUSE_CONTINUE
-					object.pause.state += object.pause.selection
-
-					//magic trick
-					object.pause.drawit = false
-				end if
-				
-				object.pause.usingTouch = touchScreen[0].down
-			else
-				temp0 = screen.xcenter
-				temp0 -= 40
-				temp1 = temp0
-				temp1 += 80
-				
-				temp4 = screen.ycenter
-				temp4 -= 30
-				temp5 = temp4
-				temp5 += 20
-				
-				temp2 = SELECTION_CONTINUE
-				while temp2 <= SELECTION_EXIT
-					CheckTouchRect(temp0, temp4, temp1, temp5)
-					
-					if checkResult > -1
-						object.pause.selection = temp2
-					else
-						if touchscreen[0].down == false
-							if object.pause.selection == temp2
-								object.pause.timer = 0
-								
-								object.pause.state = PAUSE_CONTINUE
-								object.pause.state += object.pause.selection
-
-								//magic trick
-								object.pause.drawit = false
-							end if
-						else
-							if object.pause.selection == temp2
-								object.pause.selection = SELECTION_NULL
-							end if
-						end if
-					end if
-					
-					temp4 += 20
-					temp5 += 20
-					temp2++
-				loop
-				
-				temp0 = keyPress[0].up
-				temp0 |= keyPress[0].down
-				temp0 |= keyPress[0].left
-				temp0 |= keyPress[0].right
-				temp0 |= keyPress[0].buttonA
-				temp0 |= keyPress[0].buttonB
-				temp0 |= keyPress[0].buttonC
-				temp0 |= keyPress[0].start
-				if temp0 == true
-					object.pause.usingTouch = false
-					object.pause.selection = SELECTION_CONTINUE
-				end if
-			end if
-			break
-			
-		case PAUSE_CONTINUE
-			PlaySfx(SfxName[Menu Back], false)
-			stage.state = STAGE_RUNNING
-			ResumeMusic()
-			
-			// Send the players back to their special draw order
-			foreach (GROUP_PLAYERS, currentPlayer, ACTIVE_ENTITIES)
-				player[currentPlayer].drawOrder = DRAWORDER_PLAYER
-			next
-			break
-			
-		case PAUSE_RESTART
-			PlaySfx(SfxName[Menu Select], false)
-			object.pause.state = PAUSE_FADEOUT
-			break
-			
-		case PAUSE_EXIT
-			PlaySfx(SfxName[Menu Select], false)
-			
-			// Set the info to load into the Menu
-			stage.activeList = PRESENTATION_STAGE
-			stage.listPos = 0
-			menu.bootMode = BOOTMODE_STAGESELECT
-			
-			object.pause.state = PAUSE_FADEOUT
-			break
-			
-		case PAUSE_FADEOUT
-			object.pause.timer++
-			
-			// "Choppy" on purpose, can be changed if desired
-			if object.pause.timer == 41
-				LoadStage()
-			end if
-			break
-			
-		end switch
-		break
-		
 	default
 		object.pause.state = PAUSE_INIT
 		
@@ -422,8 +271,12 @@ event ObjectUpdate
 					AddDrawListEntityRef(arrayPos0, currentPlayer)
 				end if
 			end if
+			
 			currentPlayer--
 		loop
+		break
+		
+	case STAGE_PAUSED
 		break
 		
 	end switch
@@ -443,78 +296,6 @@ event ObjectUpdate
 end event
 
 
-event ObjectDraw
-	if object.pause.drawit == true
-		// Draw the Pause Menu
-		// We don't want to draw this when fading out, just like SA2
-		
-		// Because the background uses alpha, it should only be drawn once
-		// -> Only one element of it uses alpha, the rest are grouped in here too for no real reason beyond neatness
-		if object.pause.drawnBG == false
-			
-			// First, draw the four corners of the menu
-			// They're set up in such a way that each corner is just a flipped sprite from the same position
-			object.direction = 0
-			while object.direction < 4
-				DrawSpriteScreenFX(0, FX_FLIP, screen.xcenter, screen.ycenter)
-				object.direction++
-			loop
-			
-			temp0 = screen.xcenter
-			temp0 -= 40
-			
-			temp1 = screen.ycenter
-			temp1 -= 28
-			
-			// Background
-			DrawRect(temp0, temp1, 78, 56, 224, 80, 96, 0xE0)
-			
-			// Now, draw the left border
-			// A 1px black column, followed by a 3px red
-			DrawRect(temp0, temp1, 1, 56, 8, 0, 0, 255)
-			temp0++
-			DrawRect(temp0, temp1, 3, 56, 224, 64, 96, 255)
-			
-			temp0 += 75
-			
-			// Then comes the right border, same layout but inversed
-			DrawRect(temp0, temp1, 3, 56, 224, 64, 96, 255)
-			temp0 += 3
-			DrawRect(temp0, temp1, 1, 56, 8, 0, 0, 255)
-			
-			object.pause.drawnBG = true
-		end if
-		
-		// Before the draw loop, back up the underwater yellow colour
-		GetPaletteEntry(1, 15, temp2)
-		
-		temp0 = SELECTION_CONTINUE
-		temp1 = 1
-		while temp0 < SELECTION_MAX
-			// Make the current selection highlighted
-			checkNotEqual(object.pause.selection, temp0)
-			checkResult *= 0xE0
-			checkResult += 0xE0E000
-			SetPaletteEntry(0, 15, checkResult)
-			SetPaletteEntry(1, 15, checkResult)
-			
-			DrawSpriteScreenXY(temp1, screen.xcenter, screen.ycenter)
-			temp0++
-			temp1++
-		loop
-		
-		// Restore the colours
-		SetPaletteEntry(0, 15, 0xE0E000)
-		SetPaletteEntry(1, 15, temp2)
-	end if
-	
-	// The black fade-out
-	// Do note - because nothing else is being redrawn, this black rect is persisting between frames so each new frame's rect is layered atop the old one
-	// Because of that, the fade is "exponential," so to speak, so even keeping object.pause.timer constant will still keep it fading out
-	DrawRect(0, 0, screen.xsize, screen.ysize, 0, 0, 0, object.pause.timer)
-end event
-
-
 event ObjectStartup
 	SetMusicTrack("ActComplete.ogg", TRACK_ACTFINISH, false)
 	SetMusicTrack("Invincibility.ogg", TRACK_INVINCIBLE, 38679)
@@ -527,7 +308,7 @@ event ObjectStartup
 	stage.timeOver = false
 	
 	// KEHDX - Removed a 'stage.pauseEnabled = true' from here, since we don't want the HW menu
-	// Removed demo playback fixed object range as well, as there aren't quite any demos either
+	// Removed demo playback's fixed object range as well, as there aren't quite any demos either
 
 	SpeedUpMusic 	= 0
 	SlowDownMusic 	= 0
@@ -610,7 +391,7 @@ reserve function EditorHelpers_DrawX
 
 public function EditorHelpers_DrawHitbox
 	
-#platform: USE_EDITOR
+#platform: EDITOR
 	
 	// This function is called in order to draw an object's hitbox, as a white 
 	// editor.drawingOverlay isn't set here, that's to be determined by the object calling this function
@@ -635,7 +416,10 @@ public function EditorHelpers_DrawHitbox
 	temp2 += temp0
 	temp3 += temp1
 	
-	DrawRectOutline(temp4, temp5, temp2, temp3, 255, 255, 255, 255)
+	temp4 <<= 16
+	temp5 <<= 16
+	
+	DrawRectOutline(temp4, temp5, temp2, temp3, 255, 255, 0, 255)
 	
 #endplatform
 	
@@ -644,7 +428,7 @@ end function
 
 public function EditorHelpers_DrawX
 	
-#platform: USE_EDITOR
+#platform: EDITOR
 	
 	// This function is called to draw a red X, just for when you wanna show something's *really* wrong
 	// editor.drawingOverlay isn't set here, that's for the object calling this function to decide
